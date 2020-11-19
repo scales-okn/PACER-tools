@@ -56,3 +56,26 @@ def inter_event_series(docket_entries, docket_indices):
     else:
         return []
     return inter_event
+
+def find_pattern(docket_entries, pat, rlim=None):
+    '''
+        Binary check for occurence of pattern in docket, returns True if at least one match
+        inputs
+            - docket_entries(list) - docket entries list from case json
+            - pat (regex) - the pattern to search for
+            - rlim (int) - the right limit character index to search as far as
+        output
+            (bool) - Returns true if pattern found on any line
+    '''
+    if not docket_entries or not len(docket_entries):
+        return False
+
+    # Deal with singleton line
+    if type(docket_entries)==list and type(docket_entries[0]) != list:
+        return False
+
+    for line in docket_entries:
+
+        if len(line)==4 and type(line[2])==str:
+            if re.search(pat, line[2][:rlim], re.I):
+                return True

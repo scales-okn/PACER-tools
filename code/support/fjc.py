@@ -1,8 +1,8 @@
 import re
 import sys
 import json
+import simplejson
 import csv
-import pdb
 import numpy as np
 from pathlib import Path
 
@@ -13,7 +13,7 @@ from tqdm import tqdm
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from support import settings
 from support import court_functions as cf
-from support import data_tools as dt
+from support import data_tools as dtools
 
 # District codes
 with open(settings.DATAPATH/'annotation'/'fjc_district_codes.json', 'r') as rfile:
@@ -23,6 +23,7 @@ with open(settings.DATAPATH/'annotation'/'fjc_district_codes.json', 'r') as rfil
 FJC_PERIOD_10TO20 = "10to20"
 DATE_NA = "1900-01-01"
 
+# Dictionary that maps idb column to dict with datatypes and recap key name
 IDB_COLS = {
     'AMTREC': {'dtype': np.int16, 'recap_key': 'amount_received'},
     'ARBIT': {'dtype': str, 'recap_key': 'arbitration_at_filing'},
@@ -62,7 +63,7 @@ IDB_COLS = {
 
 def load_data(case_type, years, nrows=None, all_cols=False, cols=[]):
     '''
-    Load fjc data
+    Load fjc data. Assumes that the relevant files exist and are in the settings.IDB folder
 
     Inputs:
         - case_type (str): 'cr' or 'cv'
@@ -117,7 +118,14 @@ def load_data(case_type, years, nrows=None, all_cols=False, cols=[]):
     return df
 
 def get_recap_idb_cols(case_type):
-    ''' Get the list of recap idb_data columns relevant to case_type ('cv' or 'cr')'''
+    '''
+    Get the list of recap idb_data columns relevant to case_type
+
+    Inputs:
+        - case_type: ('cv' or 'cr')
+    Output:
+        list of idb columns
+    '''
 
     # For cv, the column list includes all idb recap columns
     if case_type == 'cv':
@@ -131,17 +139,18 @@ def get_recap_idb_cols(case_type):
 
 def extract_recap_idb_data(row, case_type):
     '''
-        Extract the equivalent of the idb_data object in Recap data for a single
-        case/row, used when outputting to json
-        Inputs:
-            row (Series or dict-like): the idb data for a single case (lowercase columns)
-            case_type (str): 'cr' or 'cv'
-        Output:
+    Extract the equivalent of the idb_data object in Recap data for a single
+    case/row, used when outputting to json
+
+    Inputs:
+        - row (Series or dict-like): the idb data for a single case (lowercase columns)
+        - case_type (str): 'cr' or 'cv'
+    Output:
         dict
 
     '''
     def conv(value):
-        ''' Convert idb data, get around serialising issues with json/dicts '''
+        ''' Converion function for idb data, get around serialising issues with json/dicts '''
         # Nonetypes
         if value in [-8, "-8","-8.0", None]:
             return None
@@ -184,7 +193,6 @@ def convert_sas7(infile, outfile=None, dir=None, n_rows=None):
         - outfile (str): name for output file, else takes same name and changes extension to .csv
         - dir (str or Path): directory that infile is in, if none specified uses FJC folder
         - n_rows (str): no. of rows to convert, if none it converts all
-
     '''
     from sas7bdat import SAS7BDAT
 
@@ -200,6 +208,198 @@ def convert_sas7(infile, outfile=None, dir=None, n_rows=None):
                     csv.writer(wfile).writerow(row)
                     if n_rows and i>=n_rows:
                         break
+
+
+def split_txt(old_file, out_dir, case_type, year_lb, nrows=None):
+    '''
+    Cut one of the large .txt tab-delimited IDB datasets into multiple csv files, by year.
+
+    Inputs:
+        - old_file(str or Path): the .txt file to be split
+        - out_dir (str or Path): the output directory for new csv files
+        - case_type ('cv' or 'cr')
+        - year_lb (int): lower bound on year, to filter out rows with filedate below
+        - nrows (int): max number of rows to write (for testing small samples)
+    '''
+
+    # Create directory if it doesn't exist
+    out_dir = Path(out_dir).resolve()
+    if not out_dir.exists():
+        out_dir.mkdir()
+
+    with open(old_file, 'r+', encoding='ISO-8859-1') as rfile:
+        # Get the column headers from the first line
+        columns = rfile.readline().rstrip('\n').split('\t')
+        ind_filedate = columns.index('FILEDATE')
+
+        write_count = 0
+
+        # Session dictionary to map year to open csv writers
+        session = {}
+
+        for line in rfile.readlines():
+            # Extract the data in the line
+            row = line.rstrip('\n').split('\t')
+            if len(row) != len(columns):
+                # Error, skip row
+                continue
+
+            # Filter by year lower bound
+            year = int(row[ind_filedate].split('/')[-1])
+            if year < year_lb:
+                continue
+
+            # Check if we have a csv for 'year' and if not, start it up
+            if year not in session.keys():
+                filepath = out_dir/f"{case_type}{year}.csv"
+                session[year] = {'file': open(filepath, 'w', encoding="utf-8",
+                                                newline='\n')}
+                session[year]['writer'] = csv.writer(session[year]['file'])
+                # Write the header row for this new file
+                session[year]['writer'].writerow(['ucid','ucid_weak', *columns])
+
+            # Find the ucid and weak_ucid
+            data = {k:row[columns.index(k)] for k in ['DOCKET', 'DISTRICT', 'OFFICE']}
+            case_year = data['DOCKET'][:2]
+            case_no = data['DOCKET'][2:]
+            court = IDB_COLS['DISTRICT']['conv'](data['DISTRICT'])
+            ucid = dtools.ucid_from_scratch(court, data['OFFICE'], case_year, case_type, case_no)
+            ucid_weak = dtools.get_ucid_weak(ucid)
+
+            # Write the new row, which is (ucid, ucid_weak, <<original row data>>)
+            session[year]['writer'].writerow([ucid,ucid_weak,*row])
+
+            write_count += 1
+            if nrows:
+                if write_count >= nrows:
+                    break
+
+    for v in session.values():
+        v['file'].close()
+
+def idb_merge(years, case_type, year_buffer=1, dframe=None):
+    '''
+    Merge dataframe of cases with idb data
+
+    Inputs
+        - years (list): list of ints of years e.g. [2016,2017]
+        - case_type ('cv' or 'cr')
+        - year_buffer (int): no. of years +- to look in idb
+            e.g. if years=[2016] and year_buffer=1, idb data for (2015,2017) will be used
+        - dframe (DataFrame): specify table of case files, instead of using all of unique files table
+    Outputs
+        - final (DataFrame): the merged table
+        - match_rate (float): the no. of original casefiles matched against idb
+    '''
+    import pdb
+    pdb.set_trace()
+    if dframe is None:
+        dff = dtools.load_unique_files_df()
+        dff = dff[dff.case_type.eq(case_type) & dff.year.isin(years)].copy()
+    else:
+        dff = dframe.copy()
+    N = dff.shape[0]
+    print(f"\n{N:,} case files provided")
+
+    dff.reset_index(inplace=True)
+    dff['ucid_copy'] = dff['ucid']
+    years.sort()
+
+    # Create wider range for idb_years
+    idb_years = list(range(years[0]-year_buffer, years[-1] + year_buffer + 1))
+    print(f"Loading IDB {settings.CTYPES[case_type]} data for years: {','.join(str(x) for x in idb_years)}...")
+
+    # Load idb data, sort and drop dupes
+    df_idb = load_data(case_type, years=idb_years)
+    df_idb.sort_values(['ucid', 'filedate'], inplace=True)
+    df_idb.drop_duplicates('ucid', keep='first', inplace=True)
+
+    #Stage 1 (matching on ucid)
+    matched_mask = dff.ucid.isin(df_idb.ucid)
+    matched_ucids = dff.ucid[matched_mask]
+    keepcols = ['fpath', 'case_type', 'filing_date', 'terminating_date', 'recap', # columns from unique files table
+                 *[x.lower() for x in get_recap_idb_cols(case_type)] ]
+
+    # Make table of data merged on ucid
+    merged_ucid = dff[matched_mask].merge(df_idb, how='inner', left_on='ucid', right_on='ucid')\
+        .set_index('ucid_copy')[keepcols]
+    print(f'STAGE 1 {{matched:{sum(matched_mask):,}, unmatched:{sum(~matched_mask):,} }}')
+
+    # Reduce dff to unmatched
+    dff = dff[~matched_mask].copy()
+    # Create weak ucid
+    dff['ucid_weak'] = dtools.get_ucid_weak(dff.ucid)
+
+    # Remove matched from df_idb and reduce to weak_ucid match
+    df_idb = df_idb[~df_idb.ucid.isin(matched_ucids) & df_idb.ucid_weak.isin(dff.ucid_weak)]
+
+    # Stage 2 (matching on ucid_weak and filing date)
+    merged_weak = dff.merge(df_idb, how="inner", left_on=['ucid_weak','filing_date'],
+                             right_on=['ucid_weak', 'filedate'])\
+                             .set_index('ucid_copy')[keepcols]
+    matched_stage2 = merged_weak.shape[0]
+    print(f"STAGE 2 {{matched:{matched_stage2:,}, unmatched:{sum(~matched_mask) -matched_stage2 :,} }}")
+
+    final = pd.concat([merged_ucid, merged_weak])
+    del dff, df_idb
+
+    match_rate = final.shape[0]/N
+    print(f"Overall match rate: {match_rate :.2%}")
+
+    return final, match_rate
+
+# def idb_aggfunc(cols):
+#     '''Agg function for idb duplicates, takes first of everything except termdate (max)'''
+#     def get_first(row):
+#         return row.iloc[0]
+#     agg = {k: get_first for k in cols}
+#     agg['termdate'] = max
+#     return agg
+
+def _update_case_(row, indent):
+    '''
+    Update a single case file json with idb data
+
+    Inputs:
+        - row (Series or dict): row of the merged dataframe that contains data on
+                    the case (fpath,case_type and all idb_recap columns needed)
+        - indent (int): size of indent if pretty printing
+    '''
+    # Actually fix incorrect data
+    if row.recap:
+        # Get the case and update the idb_data key
+        case = dtools.load_case(row.fpath, recap_orig=True)
+        case['idb_data'] = extract_recap_idb_data(row, row.case_type)
+
+        # Update the outer json with idb_data
+        for key in ['date_filed', 'date_terminated', 'nature_of_suit']:
+            case[key] = case['idb_data'][key]
+
+    else:
+        # Pacer: just add in data
+        case = dtools.load_case(row.fpath)
+        case['idb_data'] = extract_recap_idb_data(row, row.case_type)
+
+    with open(settings.PROJECT_ROOT/row.fpath, 'w+', encoding='utf-8') as wfile:
+        simplejson.dump(case, wfile, ignore_nan=True, indent=indent)
+
+def execute_idb_merge(merged_df):
+    '''
+    Update casefiles from an idb merge
+
+    Inputs
+        - merged_df (DataFrame): a merged dataframe, output from idb_merge
+    '''
+
+    for i, row in tqdm( merged_df,
+                        total=merged_df.shape[0],
+                        desc=f"Updating {ct_name} case files.."
+                        ):
+        _update_case_(row, indent)
+
+##########
+### FJC MDL Panel Database stuff
+##########
 
 def pull_mdl_terminated(infile, outfile, only_data=True, dir=None):
     '''
@@ -375,210 +575,3 @@ def load_mdl_all():
     df = term.append(pend_unique)
     df = df.append(augmented)
     return df
-
-#TODO: create ucid on the fly
-# dfcv['year'] = dfcv.docket.apply(lambda x: x[:2])
-# dfcv['case_no'] = dfcv.docket.apply(lambda x: x[2:])
-# dfcv['ucid'] =
-
-def split_txt(old_file, out_dir, case_type, year_lb, nrows=None):
-    '''
-    Cut one of the large tab-delimited idb datasets into individual files by year
-
-    Inputs:
-        - old_file(str or Path): the .txt file to be split
-        - out_dir (str or Path): the output directory for new files
-        - case_type ('cv' or 'cr')
-        - year_lb (int): lower bound on year, ignore rows with filedate below
-        - nrows (int): max number of rows to write (for testing)
-    '''
-
-    # Create directory if it doesn't exist
-    out_dir = Path(out_dir).resolve()
-    if not out_dir.exists():
-        out_dir.mkdir()
-
-    with open(old_file, 'r+', encoding='ISO-8859-1') as rfile:
-        columns = rfile.readline().rstrip('\n').split('\t')
-        ind_filedate = columns.index('FILEDATE')
-
-        write_count = 0
-        session = {}
-
-        for line in rfile.readlines():
-            row = line.rstrip('\n').split('\t')
-            if len(row) != len(columns):
-                continue
-            # Filter by year lower bound
-            year = int(row[ind_filedate].split('/')[-1])
-            if year < year_lb:
-                continue
-
-            # Check if open_wfile matches current year, if not switch open file
-            if year not in session.keys():
-                filepath = out_dir/f"{case_type}{year}.csv"
-                session[year] = {'file': open(filepath, 'w', encoding="utf-8",
-                                                newline='\n')}
-                session[year]['writer'] = csv.writer(session[year]['file'])
-                session[year]['writer'].writerow(['ucid','ucid_weak', *columns])
-
-            # Now write
-            data = {k:row[columns.index(k)] for k in ['DOCKET', 'DISTRICT', 'OFFICE']}
-            #TODO: year should come from filing date not docket
-            case_year = data['DOCKET'][:2]
-            case_no = data['DOCKET'][2:]
-            court = IDB_COLS['DISTRICT']['conv'](data['DISTRICT'])
-            ucid = dt.ucid_from_scratch(court,data['OFFICE'],case_year,case_type,case_no)
-            ucid_weak = dt.get_ucid_weak(ucid)
-
-            session[year]['writer'].writerow([ucid,ucid_weak,*row])
-
-            write_count += 1
-            if nrows:
-                if write_count >= nrows:
-                    break
-
-    for v in session.values():
-        v['file'].close()
-
-def convert_txt(old_file, new_file, case_type, year_lb, limit_unique=True):
-    '''Cut one of the large tab-delimited idb datasets'''
-
-    # if limit_unqiue:
-    #     dff_idx = dt.load_unique_files_df(usecols=[0])
-
-    with open(old_file, 'r+', encoding='ISO-8859-1') as rfile:
-        columns = rfile.readline().rstrip('\n').split('\t')
-        ind_tapeyear = columns.index('TAPEYEAR')
-
-        with open(new_file,"w+", encoding="utf-8", newline="\n") as wfile:
-            writer = csv.writer(wfile, delimiter=',')
-            writer.writerow(['ucid', 'ucid_weak',*columns])
-            for line in rfile.readlines():
-                row = line.rstrip('\n').split('\t')
-                if len(row) != len(columns):
-                    continue
-
-                if int(row[ind_tapeyear]) >= year_lb:
-                    data = {k:row[columns.index(k)] for k in ['DOCKET', 'DISTRICT', 'OFFICE']}
-
-                    year = data['DOCKET'][:2]
-                    case_no = data['DOCKET'][2:]
-                    court = IDB_COLS['DISTRICT']['conv'](data['DISTRICT'])
-
-                    ucid = dt.ucid_from_scratch(court, data['OFFICE'], year,
-                                                case_type, case_no)
-                    # Make a weak ucid withoutt the office
-                    ucid_weak = dt.get_ucid_weak(ucid)
-                    writer.writerow([ucid,ucid_weak,*row])
-
-def idb_merge(years, case_type, year_buffer=1, dframe=None):
-    ''' Merge dataframe of cases with idb data
-
-    Inputs
-        - years (list): list of ints of years e.g. [2016,2017]
-        - case_type ('cv' or 'cr')
-        - year_buffer (int): no. of years +- to look in idb
-            e.g. if years=[2016] and year_buffer=1, idb data for (2015,2017) will be used
-        - dframe (DataFrame): specify table of case files, instead of using all of unique files table
-    Outputs
-        - final (DataFrame): the merged table
-        - match_rate (float): the no. of original casefiles matched against idb
-    '''
-    if dframe is None:
-        dff = dt.load_unique_files_df()
-        dff = dff[dff.case_type.eq(case_type) & dff.year.isin(years)].copy()
-    else:
-        dff = dframe.copy()
-    N = dff.shape[0]
-    print(f"\n{N:,} case files provided")
-
-    dff.reset_index(inplace=True)
-    dff['ucid_copy']=dff['ucid']
-    years.sort()
-
-    # Create wider range for idb_years
-    idb_years = list(range(years[0]-year_buffer, years[-1] + year_buffer + 1))
-    pdb.set_trace()
-    print(f"Loading IDB {settings.CTYPES[case_type]} data for years: {','.join(str(x) for x in idb_years)}...")
-
-    # Load idb data, sort and drop dupes
-    df_idb = load_data(case_type, years=idb_years)
-    df_idb.sort_values(['ucid', 'filedate'], inplace=True)
-    df_idb.drop_duplicates('ucid', keep='first', inplace=True)
-
-    #Stage 1 (matching on ucid)
-    matched_mask = dff.ucid.isin(df_idb.ucid)
-    matched_ucids = dff.ucid[matched_mask]
-    keepcols = ['fpath', 'case_type', 'filing_date', 'terminating_date',
-                'recap', *[x.lower() for x in get_recap_idb_cols(case_type)] ]
-
-    merged_ucid = dff[matched_mask].merge(df_idb, how='inner', left_on='ucid', right_on='ucid')\
-        .set_index('ucid_copy')[keepcols]
-    print(f'Stage 1- matched:{sum(matched_mask):,}, unmatched:{sum(~matched_mask):,}')
-
-    # Reduce dff to unmatched
-    dff = dff[~matched_mask]
-    dff['ucid_weak'] = dt.get_ucid_weak(dff.ucid)
-
-    # Remove matched from df_idb and reduce to weak_ucid match
-    df_idb = df_idb[~df_idb.ucid.isin(matched_ucids) & df_idb.ucid_weak.isin(dff.ucid_weak)]
-
-    # Stage 2 (matching on ucid_weak and filing date)
-    merged_weak = dff.merge(df_idb, how="inner", left_on=['ucid_weak','filing_date'],
-                             right_on=['ucid_weak', 'filedate'])\
-                             .set_index('ucid_copy')[keepcols]
-    matched_stage2 = merged_weak.shape[0]
-    print(f"Stage 2- matched:{matched_stage2:,}, unmatched:{sum(~matched_mask) -matched_stage2 :,}")
-
-    final = pd.concat([merged_ucid, merged_weak])
-    del dff, df_idb
-
-    match_rate = final.shape[0]/N
-    print(f"Overall match rate: {match_rate :.2%}")
-
-    return final, match_rate
-
-def idb_aggfunc(cols):
-    '''Agg function for idb duplicates, takes first of everything except termdate (max)'''
-    def get_first(row):
-        return row.iloc[0]
-    agg = {k: get_first for k in cols}
-    agg['termdate'] = max
-    return agg
-
-def _update_casefile_(row, indent):
-    '''
-    Update a single case file json with idb data
-
-    Inputs:
-        - row (Series or dict): row of the merged dataframe that contains data on
-                    the case (fpath,case_type and all idb_recap columns needed)
-        - indent (int): size of indent if pretty printing
-    '''
-    # Actually fix incorrect data
-    if row.recap:
-        # Get the case and update the idb_data key
-        case = dt.load_case(row.fpath, recap_orig=True)
-        case['idb_data'] = extract_recap_idb_data(row, row.case_type)
-
-        # Update the outer json with idb_data
-        for key in ['date_filed', 'date_terminated', 'nature_of_suit']:
-            case[key] = case['idb_data'][key]
-
-    else:
-        # Pacer: just add in data
-        case = dt.load_case(row.fpath)
-        case['idb_data'] = extract_recap_idb_data(row, row.case_type)
-
-    with open(settings.PROJECT_ROOT/row.fpath, 'w+', encoding='utf-8') as wfile:
-        simplejson.dump(case, wfile, ignore_nan=True, indent=indent)
-
-def execute_idb_merge(merged_df):
-    ''' Execute the merge and update casefiles'''
-
-    for i, row in tqdm( df_idb.merged_df(),
-                        total=df_idb.shape[0],
-                        desc=f"Updating {ct_name} case files.."
-                        ):
-        _update_case_(row, indent)

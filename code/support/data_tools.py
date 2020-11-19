@@ -3,10 +3,13 @@ import sys
 import json
 import numpy as np
 from pathlib import Path
+from itertools import chain
 from datetime import datetime
 
 import pandas as pd
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
+import zlib
+import base64
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from support import settings
@@ -14,7 +17,7 @@ from support import docket_entry_identification as dei
 from support import judge_functions as jf
 from support import bundler as bundler
 from support.core import std_path
-from downloader import tools as dltools
+from support import fhandle_tools as ftools
 
 def create_docket_core(case_id):
     '''
@@ -59,7 +62,7 @@ def load_recap_dump(indir):
     import glob, json, sys
     import pandas as pd
     sys.path.append('..')
-    import downloader.tools as dltools
+    import support.fhandle_tools as ftools
 
     data = {'filedate':[], 'court':[], 'nos':[], 'recap_case_id':[], 'id':[], 'termdate':[],
             'docket_core':[], 'case_name':[]}
@@ -78,7 +81,7 @@ def load_recap_dump(indir):
         data['termdate'].append( jfile['date_terminated'] )
     #Convert to the dataframe
     df = pd.DataFrame(data)
-    df['case_id'] = df.recap_case_id.apply( dltools.clean_case_id )
+    df['case_id'] = df.recap_case_id.apply( ftools.clean_case_id )
     return df
 
 def load_noacri_data(indir):
@@ -121,7 +124,7 @@ def load_query_file(query_file, main_case=True):
     output: query_df, query dataframe with clean
     '''
     import pandas as pd
-    import downloader.tools as dltools
+    import support.fhandle_tools as ftools
 
     #Load the dataframe, get rows, and drop the NA dead rows
     dfset = pd.read_html(query_file)
@@ -131,13 +134,13 @@ def load_query_file(query_file, main_case=True):
     #Pull the state court
     court_abbrev = query_file.split('/')[-1].split('_')[0]
     #Clean up the case ids
-    df['case_id'] = df.query_case_id.apply(dltools.clean_case_id)
-    df['main_case'] = df.query_case_id.apply(lambda x: dltools.main_limiter(x, court_abbrev) )
+    df['case_id'] = df.query_case_id.apply(ftools.clean_case_id)
+    df['main_case'] = df.query_case_id.apply(lambda x: ftools.main_limiter(x) )
     df['case_type'] = df.query_case_id.apply(lambda x: x.split('-')[1])
     #Get the other attributes
     df['court'] = df.query_case_id.apply(lambda x: court_abbrev)
-    # df['filedate'] = df.details.apply(dltools.extract_file_date)
-    # df['termdate'] = df.details.apply(dltools.extract_term_date)
+    # df['filedate'] = df.details.apply(ftools.extract_file_date)
+    # df['termdate'] = df.details.apply(ftools.extract_term_date)
     #Restrict to the primary case only
     if main_case==True:
         maindf = df[df.main_case==True]
@@ -152,15 +155,13 @@ idb_remap = {
     'mdl_status': 'mdl_status'
 }
 
-def remap_recap_data(recap_fpath):
+def remap_recap_data(recap_fpath=None, rjdata=None):
     '''
     Given a recap file, normalizes the process
     * recap_fpath
     output:
     *jdata
     '''
-    import json
-    import downloader.tools as dltools
 
     def standardize_date(tdate):
         '''y-m-d to m/d/y'''
@@ -172,11 +173,53 @@ def remap_recap_data(recap_fpath):
         except AttributeError:
             return None
 
+    def get_recap_docket(court, docket_entries):
+        '''
+        Remap the recap docket
+        Inputs:
+            - court (str): the court abbreviation
+            - docket_entries (list): the value from the 'docket_entries' key in recap
+        Output:
+            - list of docket entries same as parsed format
+        '''
+
+        def get_doc_links(row):
+            ''' Get links to documents (most rows don't have attachments, some do)'''
+            links = {}
+            for doc in row.get('recap_documents', []):
+                # If no attachment number then it's the line document and use index of 0
+                ind = int(doc.get('attachment_number') or 0)
+                document_data = {
+                    'url': ftools.get_pacer_url(court,'doc_link') + str(doc['pacer_doc_id']),
+                    **{k: doc[k] for k in ('page_count','filepath_ia', 'description')}
+                }
+                links[ind] = document_data
+            return links
+
+        # rows = [
+        #     {'date_filed': standardize_date(row['date_filed']),
+        #      'ind': row['entry_number'],
+        #      'docket_text': row['description'],
+        #      'links': get_doc_links(row)
+        #     }
+        #     for row in docket_entries
+        # ]
+        rows = [
+            [standardize_date(row['date_filed']),
+             row['entry_number'],
+             row['description'],
+             get_doc_links(row)
+            ]
+            for row in docket_entries
+        ]
+        return rows
+
     #Load the data
     try:
-        recap_fpath = std_path(recap_fpath)
-        jpath = settings.PROJECT_ROOT / recap_fpath
-        rjdata = json.load(open(jpath), encoding="utf-8")
+        if not rjdata:
+            recap_fpath = std_path(recap_fpath)
+            jpath = settings.PROJECT_ROOT / recap_fpath
+            rjdata = json.load(open(jpath), encoding="utf-8")
     except:
         print(f"Error loading file {recap_fpath}")
         return {}
@@ -184,31 +227,82 @@ def remap_recap_data(recap_fpath):
     tdate = standardize_date(rjdata['date_terminated'])
     case_status = 'closed' if tdate else 'open'
 
-    # Idb data
-    get_idb = lambda x: rjdata['idb_data'].get(x) if rjdata['idb_data'] else None
-    idb_data = {k: get_idb(v) for k,v in idb_remap.items()}
+    # # Idb data
+    # get_idb = lambda x: rjdata['idb_data'].get(x) if rjdata['idb_data'] else None
+    # idb_data = {k: get_idb(v) for k,v in idb_remap.items()}
+
+    # plaintiffs/defendants/criminal counts
+    plaintiffs, defendants, pending_counts, terminated_counts = {}, {}, {}, {}
+    has_petitioner_and_respondent = 'Petitioner' in str(rjdata['parties']) and 'Respondent' in str(rjdata['parties'])
+    defendant_role, plaintiff_role = ('Respondent', 'Petitioner') if has_petitioner_and_respondent else ('Defendant', 'Plaintiff')
+
+    for party in rjdata['parties']:
+        name = party['name']
+
+        lawyer_dict = {}
+        is_pro_se = 'PRO SE' in str(party)
+        if not is_pro_se and 'attorneys' in party.keys():
+            for lawyer in party['attorneys']:
+                office = lawyer['contact_raw'].split('\n')[0]
+                is_lead = 'LEAD ATTORNEY' in str(lawyer)
+                is_pro_hac = 'PRO HAC VICE' in str(lawyer)
+                lawyer_dict[lawyer['name']] = {'office':office,'trial_bar_status':None,'is_lead_attorney':is_lead,'is_pro_hac_vice':is_pro_hac}
+
+        dicti = {'lawyers': (lawyer_dict or None), 'is_pro_se':is_pro_se}
+        roles = [pt['name'] for pt in party['party_types']]
+        if defendant_role in roles:
+            dicti.update({'role':defendant_role})
+            defendants[name] = dicti
+        elif plaintiff_role in roles:
+            dicti.update({'role':plaintiff_role})
+            plaintiffs[name] = dicti
+        # else: fill this in if we start caring about roles other than Plaintiff/Petitioner and Defendant/Respondent
+
+        criminal_counts = [count for pt in party['party_types'] for count in pt['criminal_counts']]
+        pending, terminated = [], []
+        for cc in criminal_counts:
+            cc_parsed = [cc['name'], cc['disposition']]
+            if 'Count(s) remaining are dismissed' in cc['disposition']:
+                terminated.append(cc_parsed)
+            else:
+                pending.append(cc_parsed)
+        if len(pending) > 0:
+            pending_counts[name] = pending
+        if len(terminated) > 0:
+            terminated_counts[name] = terminated
 
     #Convert the data
     fdata = {
-        'case_id': dltools.clean_case_id(rjdata['docket_number']),
+        'case_flags': 'No flag data (RECAP download)',
+        'case_id': ftools.clean_case_id(rjdata['docket_number']),
         'case_name': rjdata['case_name'],
         'case_status': case_status,
         'case_type': rjdata['docket_number'].split('-')[1],
         'cause': rjdata['cause'],
-        'defendants':'',
-        'docket': [[standardize_date(tentry['date_filed']), tentry['entry_number'], tentry['description']]\
-                   for tentry in rjdata['docket_entries']],
+        'defendants': defendants,
+        'demand':None,
+        'docket': get_recap_docket(rjdata['court'], rjdata['docket_entries']) ,
         'download_court': rjdata['court'],
         'filing_date': standardize_date(rjdata['date_filed']),
+        'has_petitioner_and_respondent': has_petitioner_and_respondent,
         'judge': rjdata['assigned_to_str'],
         'jurisdiction': rjdata['jurisdiction_type'],
         'jury_demand': rjdata['jury_demand'],
+        'lead_case_id':None,
         'nature_suit': rjdata['nature_of_suit'],
-        'pending_counts':'',
-        'plaintiffs':'',
-        'terminated_counts':'',
+        'other_court':None,
+        'pending_counts':pending_counts,
+        'plaintiffs': plaintiffs,
+        'referred_judge': rjdata['referred_to_str'],
+        'terminated_counts':terminated_counts,
         'terminating_date': tdate,
-        **idb_data
+        'source':'recap',
+        'ucid': ucid(rjdata['court'], ftools.clean_case_id(rjdata['docket_number'])),
+        # MDL/Multi keys
+        **{k:None for k in ['mdl_code', 'mdl_id_source','is_mdl', 'is_multi']},
+        # Billing keys
+        **{k:None for k in ['billable_pages', 'cost','n_docket_reports',]},
+        # **idb_data
     }
     return fdata
 
@@ -226,7 +320,54 @@ def year_check(dstring, year_pull):
         year_diff = 0
     return year_diff
 
-def convert_filepaths_list(infile=None, outfile=None, to_file=False, file_list=None, nb=False, mdl=True, nrows=None):
+def generate_unique_filepaths(outfile=None, to_file=False, n=None):
+    '''
+    Create a list of unique filepaths and export to txt
+    Inputs:
+        - outfile (str or Path) - the output file name (.csv) relative to the project root
+        - to_file (bool) - whether or not to output the data to a .csv
+        - n (int) - no. of cases to use (for testing)
+    Outputs:
+        DataFrame of file metadata (also output to outfile if output=True)
+    '''
+    import pandas as pd
+    tqdm.pandas()
+
+    pdset, ucidset = [], []
+
+    # Check output specified before running
+    if to_file and not outfile:
+        raise ValueError("Argument 'outfile' cannot be empty if 'to_file' is True")
+
+    pacer_jsons = [court_dir.glob('json/*.json') for court_dir in settings.PACER_PATH.glob('*')
+                    if court_dir.is_dir()]
+    recap_jsons = settings.RECAP_PATH.glob('*.json')
+
+    #Iterate through all the json_paths
+    for i, fpath in enumerate(chain(*pacer_jsons, recap_jsons)):
+        print(fpath)
+        #Get the temp df object
+        tdf = convert_filepaths_list(file_list=[fpath])
+        ucid = tdf.index[0]
+        #check to make sure the ucid is not in ucidset, then append both
+        if ucid not in ucidset:
+            ucidset.append(ucid)
+            pdset.append(tdf)
+
+        if n and i>=n-1:
+            break
+
+    #Concatenate the pdset
+    df = pd.concat(pdset)
+
+    #Write the file
+    if to_file:
+        outfile = std_path(outfile)
+        df.to_csv(outfile)
+
+    return df
+
+def convert_filepaths_list(infile=None, outfile=None, to_file=False, file_list=None, nrows=None):
     '''
     Convert the list of unique filepaths into a DataFrame with metadata and exports to csv
 
@@ -235,46 +376,37 @@ def convert_filepaths_list(infile=None, outfile=None, to_file=False, file_list=N
         - outfile (str or Path) - the output file name (.csv) relative to the project root
         - to_file (bool) - whether or not to output the data to a .csv
         - file_list (list) - list of filepaths, bypasses infile and reads list directly
-        - nb (bool) - whether its being run in a notebook (to improve tqdm interface)
-        - mdl (bool) - whether to get mdl data
         - nrows (int) - number of rows, if none then all
     Outputs:
         DataFrame of file metadata (also output to outfile if output=True)
     '''
     import pandas as pd
-    from tqdm.notebook import tqdm as tqdm_notebook
-    if nb:
-        tqdm_notebook.pandas()
-    else:
-        tqdm.pandas()
+    tqdm.pandas()
 
     # Map of keys to functions that extract their values (avoids keeping separate list of keys/property names)
-    #c: case json, f: filepath, m: mdl data json
+    #c: case json, f: filepath
     dmap = {
-        'court': lambda c,f,m: c['download_court'] if is_recap(f) else Path(f).parent.parent.name,
-        'year': lambda c,f,m: c['filing_date'].split('/')[-1],
-        'filing_date': lambda c,f,m: c['filing_date'],
-        'terminating_date': lambda c,f,m: c.get('terminating_date'),
-        'case_id': lambda c,f,m: dltools.clean_case_id(c['case_id']),
-        'case_type': lambda c,f,m: c['case_type'],
-        'nature_suit': lambda c,f,m: dei.nos_matcher(c['nature_suit'], short_hand=True) or '',
-        'judge': lambda c,f,m: jf.clean_name(c.get('judge')),
-        'recap': lambda c,f,m: is_recap(f),
+        'court': lambda c,f: c['download_court'] if is_recap(f) else Path(f).parent.parent.name,
+        'year': lambda c,f: c['filing_date'].split('/')[-1],
+        'filing_date': lambda c,f: c['filing_date'],
+        'terminating_date': lambda c,f: c.get('terminating_date'),
+        'case_id': lambda c,f: ftools.clean_case_id(c['case_id']),
+        'case_type': lambda c,f: c['case_type'],
+        'nature_suit': lambda c,f: dei.nos_matcher(c['nature_suit'], short_hand=True) or '',
+        'judge': lambda c,f: jf.clean_name(c.get('judge')),
+        'recap': lambda c,f: is_recap(f),
+        'is_multi': lambda c,f: c['is_multi'],
+        'is_mdl': lambda c,f: c['is_mdl'],
+        'mdl_code': lambda c,f: c['mdl_code']
+
     }
-    if mdl:
-        dmap.update({
-        'is_multi': lambda c,f,m: m['is_multi'],
-        'is_mdl': lambda c,f,m: m['is_mdl'],
-        'mdl_code': lambda c,f,m: m.get('mdl_code')
-        })
 
     properties = list(dmap.keys())
 
     def get_properties(fpath):
         ''' Get the year, court and type for the case'''
         case = load_case(fpath)
-        mdl_data = dei.mdl_check(fpath, case) if mdl else None
-        return tuple(dmap[key](case,fpath,mdl_data) for key in properties )
+        return tuple(dmap[key](case,fpath) for key in properties)
 
     # Check output specified before running
     if to_file and not outfile:
@@ -292,14 +424,19 @@ def convert_filepaths_list(infile=None, outfile=None, to_file=False, file_list=N
     # Convert filepath to relative format
     def _clean_fpath_(x):
         p = std_path(x)
-        if 'pacer-scraper' in p.parts:
+        if 'scales_data_dev' in p.parts:
             return str(p.relative_to(settings.PROJECT_ROOT))
         else:
             return str(p)
     df.fpath = df.fpath.apply(lambda x: _clean_fpath_(x))
     # Build year and court cols
-    print('\nExtracting case properties...')
-    properties_vector = df.fpath.progress_map(get_properties)
+
+    # Only do progress bar if it's more than 1
+    if len(df) > 1:
+        print('\nExtracting case properties...')
+        properties_vector = df.fpath.progress_map(get_properties)
+    else:
+        properties_vector = df.fpath.map(get_properties)
     prop_cols = zip(*properties_vector)
 
     # Insert new columns, taking names from ordering of properties
@@ -307,7 +444,7 @@ def convert_filepaths_list(infile=None, outfile=None, to_file=False, file_list=N
         df[properties[i]] = new_col
 
     # Set UCID index
-    df['ucid'] = ucid(df.court, df.case_id, series=True)
+    df['ucid'] = ucid(df.court, df.case_id)#, series=True) #Not sure why this was here
     df = df.set_index('ucid')
 
     # Judge matching
@@ -358,7 +495,7 @@ def load_dockets(court_pull = 'all', year_pull = None):
         dockets.append(jdata)
     return dockets
 
-def load_unique_files_df(file=settings.UNIQUE_FILES_TABLE,fill_cr=False, **kwargs):
+def load_unique_files_df(file=settings.UNIQUE_FILES_TABLE, fill_cr=False, **kwargs):
     '''
         Load the unique files dataframe
 
@@ -427,12 +564,12 @@ def load_case(fpath, html=False, recap_orig=False):
         if html:
             hpath = get_pacer_html(jpath)
             if hpath:
-                return open(settings.PROJECT_ROOT / hpath, 'r').read()
+                return str( open(settings.PROJECT_ROOT / hpath, 'rb').read() )
             else:
                 raise FileNotFoundError('HTML file not found')
         else:
             jdata = json.load( open(settings.PROJECT_ROOT / jpath, encoding="utf-8") )
-            jdata['case_id'] = dltools.clean_case_id(jdata['case_id'])
+            jdata['case_id'] = ftools.clean_case_id(jdata['case_id'])
 
             # Idb data
             get_idb = lambda x: jdata['idb_data'].get(x) if jdata.get('idb_data') else None
@@ -482,12 +619,12 @@ def ucid(court, case_id, clean=False):
     '''
     if type(case_id)==pd.Series:
         if not clean:
-            return court + ';;' + case_id.map(dltools.clean_case_id)
+            return court + ';;' + case_id.map(ftools.clean_case_id)
         else:
             return court + ';;' + case_id
     else:
         if not clean:
-            return f"{court};;{dltools.clean_case_id(case_id)}"
+            return f"{court};;{ftools.clean_case_id(case_id)}"
         else:
             return f"{court};;{case_id}"
 
@@ -502,12 +639,19 @@ def ucid_from_scratch(court, office, year, case_type, case_no):
     return ucid(court, case_id)
 
 def get_ucid_weak(ucid):
-    ''' Get a weakened ucid with the office removed'''
+    '''
+    Get a weakened ucid with the office removed
+
+    Inputs:
+        - ucid (str): a correctly formed ucid
+    Output:
+        (str) a weakened ucid e.g. 'ilnd;;16-cv-00001'
+     '''
 
     if type(ucid)==pd.Series:
-        return ucid.str.replace(r'\d:', r':')
+        return ucid.str.replace(rf"{ftools.re_com['office']}:", r':')
     else:
-        return re.sub(r'\d:', r':', ucid)
+        return re.sub(rf"{ftools.re_com['office']}:", r':', ucid)
 
 def parse_ucid(ucid):
     '''
@@ -555,3 +699,58 @@ def bundle_from_df(df, name):
 def is_recap(fpath):
     '''Determine if a case is a recap case based on the filepath'''
     return 'recap' in std_path(fpath).parts
+
+def group_dockets(docket_fpaths):
+    '''
+    Group dockets by case
+
+    Inputs:
+        - docket_fpaths (list of str): list of docket filepaths
+    Outputs:
+        - a list of tuples of docket filepaths (one tuple per case)
+    '''
+
+    df = pd.DataFrame(docket_fpaths, columns=['fpath'])
+    df['case_no'] = df.fpath.apply(lambda x:Path(x).stem).map(ftools.colonize)
+
+    # Sort on filename, assumes that this builds the correct order for updated filenames
+    df.sort_values('fpath', inplace=True)
+
+    df['decomposed'] = df.case_no.map(ftools.decompose_caseno)
+    df['case_id'] = df.decomposed.map(ftools.build_case_id)
+
+    cases = df.groupby('case_id')['fpath'].apply(tuple).to_list()
+    return cases
+
+# n.b.: compress_data and decompress_data may no longer be needed after updates to parse_pacer.py (11/2/20)
+def compress_data(data):
+    '''Compress complex data into a JSON-serializable format (written to generate the 'member_cases' field in JSONs from parse_pacer.py)'''
+    return base64.b64encode(zlib.compress(json.dumps(data).encode('utf-8'),9)).decode('utf-8')
+
+def decompress_data(data):
+    '''Reverse the effects of compress_data'''
+    return json.loads(zlib.decompress(base64.b64decode(data.encode('utf-8'))).decode('utf-8'))
+
+def parse_transaction_history(html_text):
+    '''
+    Parse the text of the transaction history receipt table
+
+    Inputs:
+        - html_text (str): text of the page
+    Output:
+        - a dict of results, keys from re named groups (timestamp, user, ... etc)
+    '''
+
+    # Srub the html tags from the text
+    html_text = dei.scrub_tags(html_text)
+
+    re_transaction_history = \
+        r"Transaction Receipt (?P<timestamp>[\s\S]+?)\s+"\
+        r"Pacer Login:\s*(?P<user>[a-zA-Z0-9]+)[\s\S]+?"\
+        r"Description:\s+(?P<description>[\s\S]+?)"\
+        r"\s+[a-zA-Z\s]+:\s+(?P<search_criteria>[\s\S]+?)"\
+        r"\s+Billable Pages:\s+(?P<billable_pages>\d+)"\
+        r"\s+Cost:\s+(?P<cost>\d+\.\d+)"
+
+    match =  re.search(re_transaction_history, html_text, re.I)
+    return match.groupdict() if match else {}

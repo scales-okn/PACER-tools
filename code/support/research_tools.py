@@ -4,14 +4,29 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-from support import data_tools as dt
+from support import data_tools as dtools
 
 # Case-level metadata for results
 case_metadata = {
-    'ucid': lambda case: dt.ucid(case['download_court'], case['case_id']),
+    'ucid': lambda case: dtools.ucid(case['download_court'], case['case_id']),
     'court': lambda case: case['download_court'],
     'judge': lambda case: case['judge'],
 }
+
+def pattern_matcher(patterns, text_str):
+    '''
+    Search for a group of patterns in the same string, return spans of matches
+
+    Inputs:
+        - patterns (dict): key-value pairs of pattern name to pattern value (regex pattern)
+        - text_str (str): the text to search in
+    Output
+        matches(dict): key-value pairs of (pattern name, match span),
+                if there is a match the span is a tuple of integers, otherwise it is None
+    '''
+    _get_span_ = lambda match: match.span() if match else None
+
+    return {name: _get_span_(re.search(pattern, text_str,re.I)) for name,pattern in patterns.items()}
 
 def wide_net_match_line(docket_line, case, wide_net=[], match_fn=None):
     '''
@@ -25,7 +40,7 @@ def wide_net_match_line(docket_line, case, wide_net=[], match_fn=None):
     if len(wide_net):
         ## TODO: Verify this full pattern works
         full_pattern = '|'.join(f"({pat})" for pat in wide_net)
-        return bool(re.search(full_pattern, docket_line[2], re.I))
+        return bool(re.search(full_pattern, docket_line['docket_text'], re.I))
     else:
         return match_fn(docket_line, case)
 
@@ -50,13 +65,13 @@ def row_builder(docket_line, ind, case, fpath, patterns, computed_attrs={},  rli
         # Case-level metadata
         **{k: fn(case) for k,fn in case_metadata.items()},
         'fpath': fpath,
-        'date': docket_line[0],
+        'date': docket_line['date_filed'],
         'ind':ind,
-        'text': docket_line[2][:100],
+        'text': docket_line['docket_text'][:100],
         # Computed attribues
         **{k: fn(docket_line, case) for k,fn in computed_attrs.items()},
         # Pattern matches
-        **{k: int(bool(re.search(v, docket_line[2][:rlim], re.I))) for k,v in patterns.items()},
+        **pattern_matcher(patterns, docket_line['docket_text'][:rlim]),
     }
     return row
 
@@ -68,11 +83,9 @@ def get_case_matches(fpath, patterns, wide_net, computed_attrs={}, rlim=None, li
     A list of obersvation rows
     '''
     case_rows = []
-    case = dt.load_case(fpath)
+    case = dtools.load_case(fpath)
 
-    for ind, line in enumerate(case.get('docket', [])):
-        if not(type(line)==list and len(line)==3):
-            continue
+    for ind, line in enumerate(case['docket']):
 
         if wide_net_match_line(line, case, wide_net, line_match_fn):
             # Use row builder

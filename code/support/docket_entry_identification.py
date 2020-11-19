@@ -6,13 +6,15 @@ import pandas as pd
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from support import settings
-from support import data_tools as dt
-from downloader import tools as dltools
+from support import data_tools as dtools
+from support import fhandle_tools as ftools
 
 # Import the nature of suit Spreadsheet
 nos_file = settings.DATAPATH / 'annotation' / 'nature_suit.csv'
 df_nos = pd.read_csv(nos_file)
 df_nos['composite'] = df_nos.name + ' ' + df_nos.major_type
+
+re_mdl = r"MDL\s*(no.|[-_])?\s*(?P<code>\d{2,5})"
 
 def date_transformer(x):
     import datetime
@@ -236,9 +238,9 @@ def backfill_judge_assignment(judge_track):
         judge_track.reverse()
     return judge_track
 
-def identify_judge_entries(jfhandle = None, docket = None):
+def identify_judge_entriesv1(jfhandle = None, docket = None, djudge = ''):
     '''
-    Attributes each docket entry to a judge. 
+    Attributes each docket entry to a judge.
     V1 -- Regex rules to identify docket 'chunks' and then do block attribution to chunk
           Returned [[district, case_id, judge_name, nos, clean_nos, entry number, entry text], ...]
     V2 -- Spacy langauge model to identify judge names on per entry basis. Entries without attribution are done via
@@ -246,7 +248,119 @@ def identify_judge_entries(jfhandle = None, docket = None):
           Returns [judge name, judge name, ... ] that will be the same length as the inputed docket
     input:
        * jfhandle -- str (opt), Filename for the json file
-       * docket -- list (opt), default is None. Will supercede the json file 
+       * docket -- list (opt), default is None. Will supercede the json file
+    output:
+       * judge_ind_entries -- list, [judge name, judge name, ...]
+    '''
+    def _clean_name(judge_name, punc=True):
+        #deletions
+        titles = ['Judge ', 'Senior Judge ', 'Magistrate Judge ', 'Chief Judge ', 'Honorable ']
+        puncs = ['\.', ',']
+        #Clean the titles
+        try:
+            for title in titles:
+                if title in judge_name:
+                    judge_name = judge_name.split(title)[-1]
+                if punc == True:
+                    for punc in puncs:
+                        judge_name = re.sub('.,', '', judge_name)
+                judge_name = judge_name.strip(' ')
+        except TypeError:
+                pass
+        return judge_name
+
+    import json
+    import re
+    import spacy
+    import sys
+    sys.path.append('..')
+    import support.data_tools as dtools
+    import support.settings as settings
+
+    #Input check
+    if jfhandle == None and docket == None:
+        print('INPUT ERROR: No docket or json filehandle provided. Returning None')
+        return None
+
+    #Load the data
+    if not docket:
+        case = dtools.load_case(jfhandle)
+        docket = case['docket']
+        djudge = case['judge']
+
+    #Data and transfer phrase
+    judge_ind_entries = []
+    transfer_phrase = 'EXECUTIVE COMMITTEE ORDER: It appearing that cases previously assigned'
+
+    #Check to see if there are transfers
+    dcheck = check_docket(docket)
+    transfer_indices = []
+    if dcheck:
+        for i, dline in enumerate(docket):
+            if transfer_phrase in dline[-1]:
+                transfer_indices.append(i)
+    #If there are transfers, divide it up
+    if transfer_indices != []:
+        #need to check against the last index being the last entry
+        if transfer_indices[-1] == len(docket)-1 and len(transfer_indices)==1:
+            tindices = [0,-1]
+        elif transfer_indices[-1] == len(docket)-1:
+            tindices = [0] + transfer_indices
+        #If not then iterate normally with the last entry
+        else:
+            tindices = [0] + transfer_indices + [-1]
+        #Block iteration
+        if tindices:
+            #Iterate through the blocks
+            for ti, block_index in enumerate(tindices[:-1]):
+                end_index = tindices[ti+1]
+                if end_index == -1:
+                    docket_block = docket[block_index:]
+                else:
+                    docket_block = docket[block_index:end_index+1]
+                pjudge = identify_judge(docket_block)
+                if pjudge==' ':
+                    if default_attr == True:
+                        pjudge = djudge
+                judge_ind_entries += [nonetype_sanitizer( _clean_name(pjudge,punc=False) ) for x in docket ]
+    #Only one judge
+    else:
+        #Error case check
+        wrong_assignment=False
+        for dline in docket:
+            try:
+                if 'assigned in error' in dline[-1]:
+                    wrong_assignment = True
+                elif 'assigned' in dline[-1] and 'in error' in dline[-1]:
+                    wrong_assignment = True
+                elif 'clerical error' in dline[-1]:
+                    wrong_assignment = True
+                elif 'shall not be used for any other proceeding' in dline[-1]:
+                    wrong_assignment = True
+            except TypeError:
+                #Type error is a suppressed case
+                print(district, case_id)
+        #If the wrong assignment is there, use the function to identify the judge
+        if wrong_assignment == True:
+            pjudge = identify_judge(docket)
+        else:
+            pjudge = djudge
+        #Now add the lines
+        judge_ind_entries += [nonetype_sanitizer( _clean_name(pjudge, punc=False) ) for x in docket]
+    return judge_ind_entries
+
+
+def identify_judge_entries(jfhandle = None, docket = None):
+    '''
+    Attributes each docket entry to a judge.
+    V1 -- Regex rules to identify docket 'chunks' and then do block attribution to chunk
+          Returned [[district, case_id, judge_name, nos, clean_nos, entry number, entry text], ...]
+    V2 -- Spacy langauge model to identify judge names on per entry basis. Entries without attribution are done via
+          a forward and then backwards backfilling routine, assigning the closest attributed judge to the entry
+          Returns [judge name, judge name, ... ] that will be the same length as the inputed docket
+    input:
+       * jfhandle -- str (opt), Filename for the json file
+       * docket -- list (opt), default is None. Will supercede the json file
     output:
        * judge_ind_entries -- list, [judge name, judge name, ...]
     '''
@@ -264,7 +378,7 @@ def identify_judge_entries(jfhandle = None, docket = None):
     if jfhandle == None and docket == None:
         print('INPUT ERROR: No docket or json filehandle provided. Returning None')
         return None
-    
+
     #Load the data
     if not docket:
         case = dtools.load_case(jfhandle)
@@ -361,11 +475,29 @@ def get_case_flags(html_string):
     re_flag_line = r'''<table.+?<td align="right">.+?</table>'''
     flag_line = re.search(re_flag_line, html_string, re.DOTALL)
     if flag_line:
-        results = re.findall(r'''<span.*?>([\w\d\s]+)</span>''',flag_line.group())
+        results = re.findall(r'''<span.*?>([\w\d\s\-()]+)</span>''',flag_line.group())
         if results:
             return ",".join(results)
 
+def mdl_code_from_string(string):
+    ''' Search for mdl_code in a certain string'''
+    mdl_match = re.search(re_mdl, string, re.IGNORECASE)
+    if mdl_match:
+        return int(mdl_match.groupdict()['code'])
 
+def mdl_code_from_casename(casename):
+    try:
+        casename_data = ftools.decompose_caseno(casename)
+    except ValueError:
+        pass
+
+    try:
+        casename_data = ftools.decompose_caseno(casename, pattern=ftools.re_mdl_caseno_condensed)
+    except ValueError:
+        return None
+
+    if casename_data['case_type'].lower() in ['md','ml', 'mdl']:
+        return int(casename_data['case_no'])
 
 def get_mdl_code(mdl_data, html_string=None, case=None):
     '''
@@ -375,7 +507,7 @@ def get_mdl_code(mdl_data, html_string=None, case=None):
         fpath (str or Path): filepath for the case
         mdl_data (dict): the output from mdl_check method
         html_string (str): the html string for the case
-        case (dict): the case json data from dt.load_case
+        case (dict): the case json data from dtools.load_case
     Output:
         code (int): the mdl code
         source_code (str): the source used to identify the code
@@ -384,32 +516,11 @@ def get_mdl_code(mdl_data, html_string=None, case=None):
     if not (html_string or case):
         raise ValueError('Must supply either html_string or case')
 
-    def _code_from_string_(string):
-        ''' Search for mdl_code in a certain string'''
-        mdl_match = re.search(re_mdl, string, re.IGNORECASE)
-        if mdl_match:
-            return int(mdl_match.groupdict()['code'])
-
-    def _code_from_casename_(casename):
-        try:
-            casename_data = dltools.decompose_caseno(casename)
-        except ValueError:
-            pass
-
-        try:
-            casename_data = dltools.decompose_caseno(casename, pattern=dltools.re_mdl_caseno_condensed)
-        except ValueError:
-            return None
-
-        if casename_data['case_type'].lower() in ['md','ml', 'mdl']:
-            return int(casename_data['case_no'])
-
-    re_mdl = r"MDL\s?(?:no\.? )?(?P<code>\d{2,5})"
 
     # Check lead case
     lead_case_id = mdl_data.get('lead_case_id')
     if lead_case_id:
-        code = _code_from_casename_(lead_case_id)
+        code = mdl_code_from_casename(lead_case_id)
         if code:
             return (code, 'lead_case_id')
 
@@ -417,12 +528,12 @@ def get_mdl_code(mdl_data, html_string=None, case=None):
     if html_string:
         flags = get_case_flags(html_string)
         if flags:
-            code = _code_from_string_(flags)
+            code = mdl_code_from_string(flags)
             if code:
                 return (code, 'flag')
 
         # Check rest of html for string
-        code = _code_from_string_(html_string)
+        code = mdl_code_from_string(html_string)
         if code:
             return  (code, 'html_string')
 
@@ -433,7 +544,7 @@ def get_mdl_code(mdl_data, html_string=None, case=None):
             return (code, 'idb_mdl_docket')
         # Check if it's an mdl case
         casename = case.get('case_id')
-        code = _code_from_casename_(casename)
+        code = mdl_code_from_casename(casename)
         if code:
             return (code, 'casename')
 
@@ -443,7 +554,7 @@ def get_mdl_code(mdl_data, html_string=None, case=None):
         if docket and len(docket[0])==3:
             try:
                 for line in docket:
-                    code = _code_from_string_(line[2])
+                    code = mdl_code_from_string(line[2])
                     if code:
                         return (code, 'docket')
             except:
@@ -484,7 +595,8 @@ def identify_mdl_from_html(html):
 
     idx_filed = html.index('date filed')
     re_mdl_flag = "(?<![a-z])mdl(?![a-z])"
-    flag_found = bool(re.search(re_mdl_flag, get_case_flags(html), re.I))
+    case_flags = get_case_flags(html)
+    flag_found = bool(re.search(re_mdl_flag, get_case_flags(html), re.I)) if case_flags else False
 
     if not (flag_found or re.search('member cases?|case in other court', html[:idx_filed])):
         return {'is_multi': False}
@@ -492,17 +604,18 @@ def identify_mdl_from_html(html):
     # Start from member cases link to avoid lead case
     try:
         idx_member = html.index('member case')
-        truncated_member_list = bool(re.search(dltools.re_members_truncated, html[idx_member:idx_filed], re.I) )
-        member_cases = [id_from_atag(atag) for atag in re.findall(dltools.re_case_link, html[idx_member:idx_filed], re.I)]
+        truncated_member_list = bool(re.search(ftools.re_members_truncated, html[idx_member:idx_filed], re.I) )
+        member_cases = [id_from_atag(atag) for atag in re.findall(ftools.re_case_link, html[idx_member:idx_filed], re.I)]
         has_member_cases = truncated_member_list or len(member_cases)
 
-        lead_case_link = re.search(dltools.re_lead_link, html[:idx_filed], re.I)
+        lead_case_link = re.search(ftools.re_lead_link, html[:idx_filed], re.I)
         lead_case_id = id_from_atag(lead_case_link.group()) if lead_case_link else None
     except ValueError:
         member_cases, lead_case_link, lead_case_id = None,None,None
+        has_member_cases = False
 
     # Get the "Case in other court: {court}, {case} data"
-    other_court_line_match = re.search(dltools.re_other_court, html[:idx_filed], re.I)
+    other_court_line_match = re.search(ftools.re_other_court, html[:idx_filed], re.I)
     if other_court_line_match:
         try:
             # Extract the text
@@ -547,21 +660,21 @@ def mdl_check(fpath, case_jdata=None):
                 and not mdl_data.get('lead_case_id')
 
     # Recap
-    if dt.is_recap(fpath):
-        case_jdata = dt.load_case(fpath) if not case_jdata else case_jdata
+    if dtools.is_recap(fpath):
+        case_jdata = dtools.load_case(fpath) if not case_jdata else case_jdata
         mdl_data = identify_mdl_from_json_data(case_jdata)
 
     # Pacer
     else:
 
         # Try html first
-        case_html = dt.load_case(fpath, html=True).replace('&nbsp;', ' ').lower()
+        case_html = dtools.load_case(fpath, html=True).replace('&nbsp;', ' ').lower()
         mdl_data_html = identify_mdl_from_html(case_html)
         if mdl_data_html['is_multi'] and mdl_data_html['mdl_code']:
             mdl_data = mdl_data_html
         else:
             # Then try idb from json
-            case_jdata = dt.load_case(fpath) if not case_jdata else case_jdata
+            case_jdata = dtools.load_case(fpath) if not case_jdata else case_jdata
             mdl_data_json = identify_mdl_from_json_data(case_jdata)
             if mdl_data_json['is_multi'] and mdl_data_json['mdl_code']:
                 mdl_data = mdl_data_json
@@ -582,3 +695,7 @@ def mdl_check(fpath, case_jdata=None):
         mdl_data['is_mdl'] = mdl_data['is_multi'] and not exclude(mdl_data)
 
     return mdl_data
+
+def scrub_tags(html_string):
+    ''' Remove all html tags from a string of html source string'''
+    return re.sub(r"<[\s\S]+?>", '', html_string)

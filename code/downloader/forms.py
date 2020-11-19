@@ -1,7 +1,7 @@
 import sys
 import time
 import pdb
-import simplejson
+import json
 from pathlib import Path
 
 import click
@@ -447,7 +447,7 @@ def config_builder(tmp):
                 print('File already exists')
             else:
                 with open(fpath, 'w+', encoding="utf-8") as wfile:
-                    simplejson.dump(user_input, wfile, indent=2)
+                    json.dump(user_input, wfile, indent=2)
                 break
         else:
             break

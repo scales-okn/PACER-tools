@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from support import settings
-from support import data_tools as dt
+from support import data_tools as dtools
 
 def style(additional=''):
     base_style = '''
@@ -78,7 +78,7 @@ def bundler(df, name):
 
         # If it's a pacer file, get the html
         if 'pacer' in abs_path.parts:
-            abs_path = dt.get_pacer_html(abs_path)
+            abs_path = dtools.get_pacer_html(abs_path)
 
         # Copy file
         new_name = row.ucid.replace(':', '-')
@@ -113,5 +113,5 @@ def copy_file(old, new_dir, new_name=None):
         new_full_name = new_name + ext
     else:
         new_full_name = old.name
-    shutil.copy(old, new_dir/new_full_name)
+    shutil.copyfile(old, new_dir/new_full_name)
     return new_full_name

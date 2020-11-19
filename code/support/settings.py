@@ -22,8 +22,11 @@ FJC =  DATAPATH / 'fjc'
 IDB = FJC / 'idb'
 LOG_DIR = PROJECT_ROOT / 'code' / 'downloader' / 'logs'
 
-UNIQUE_FILES_LIST = DATAPATH / 'unique_docket_filepaths.txt'
 UNIQUE_FILES_TABLE = DATAPATH / 'unique_docket_filepaths_table.csv'
+
+# Parser Files
+MEMBER_LEAD_LINKS = DATAPATH / 'annotation' / 'member_lead_links.csv'
+ROLE_MAPPINGS = DATAPATH / 'annotation' / 'role_mappings.json'
 
 # Annotation Files
 COURTFILE = DATAPATH / 'annotation' / 'district_courts.csv'
@@ -31,6 +34,7 @@ JUDGEFILE = DATAPATH / 'annotation' / 'judge_demographics.csv'
 EXCLUDE_CASES = DATAPATH / 'exclude.csv'
 MEM_DF = PROJECT_ROOT / 'code' / 'downloader' / 'member_cases.csv'
 STATEY2CODE = DATAPATH / 'annotation' / 'statey2code.json'
+FLAGS_DF = DATAPATH / 'annotation' / 'case_flags.csv'
 
 # Misc
 CTYPES = {'cv':'civil', 'cr':'criminal' }
