@@ -118,12 +118,12 @@ To see more specifics, options and use cases check out the detailed documentatio
 
 # Parser Tutorial
 
-This short section explains how to use the SCALES Parser tool to read HTMLs downloaded from Pacer and convert them into JSON format. The parser takes as its input the results of running the [docket scraper](README.md/#4-docket-scraper) - namely, a folder of HTMLs.
+This short section explains how to use the SCALES Parser tool to read HTMLs downloaded from Pacer and convert them into JSON format. The parser takes as its input the results of running the [docket scraper](README.md#4-docket-scraper) - namely, a folder of HTMLs.
 
 **Running script**
 To use the parser on the HTMLs from the docket scraper in the previous tutorial, we will simply run the following:
 
-    python parse_pacer.py ../../data/pacer/psc/html/ ../../data/pacer/psc/json/
+    python parse_pacer.py ../../data/pacer/psc/html ../../data/pacer/psc/json
 
 **Result**
 Once the parser has finished, all the parsed versions of the HTML files can be found in */data/pacer/psc/json*.
