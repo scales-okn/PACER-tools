@@ -1,11 +1,11 @@
 # Table of Contents
-* [Scraper Tutorial]('README.md/#scraper-tutorial')
-    1) [Getting Started]('README.md/#1-getting-started')
-    2) [Pacer credentials]('README.md/#2-pacer-credentials')
-    3) [Query Scraper]('README.md/#3-query-scraper')
-    4) [Docket Scraper]('README.md/#4-docket-scraper')
-    5) [Document Scraper]('README.md/#5-document-scraper')
-* [Parser Tutorial]('README.md/#parser-tutorial')
+* [Scraper Tutorial](README.md#scraper-tutorial)
+    1) [Getting Started](README.md#1-getting-started)
+    2) [Pacer credentials](README.md#2-pacer-credentials)
+    3) [Query Scraper](README.md#3-query-scraper)
+    4) [Docket Scraper](README.md#4-docket-scraper)
+    5) [Document Scraper](README.md#5-document-scraper)
+* [Parser Tutorial](README.md#parser-tutorial)
 
 # Scraper Tutorial
 This is a tutorial on how to use the SCALES Scraper tool to download data from PACER. 
@@ -118,7 +118,7 @@ To see more specifics, options and use cases check out the detailed documentatio
 
 # Parser Tutorial
 
-This short section explains how to use the SCALES Parser tool to read HTMLs downloaded from Pacer and convert them into JSON format. The parser takes as its input the results of running the [docket scraper](#README.md/4-docket-scraper) - namely, a folder of HTMLs.
+This short section explains how to use the SCALES Parser tool to read HTMLs downloaded from Pacer and convert them into JSON format. The parser takes as its input the results of running the [docket scraper](README.md/#4-docket-scraper) - namely, a folder of HTMLs.
 
 **Running script**
 To use the parser on the HTMLs from the docket scraper in the previous tutorial, we will simply run the following:
