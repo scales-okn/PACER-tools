@@ -1,4 +1,13 @@
-# Tutorial
+# Table of Contents
+* [Scraper Tutorial]('#scraper-tutorial')
+    1) [Getting Started]('#1-getting-started')
+    2) [Pacer credentials]('#2-pacer-credentials')
+    3) [Query Scraper]('#3-query-scraper')
+    4) [Docket Scraper]('#4-docket-scraper')
+    5) [Document Scraper]('#5-document-scraper')
+* [Parser Tutorial]('#parser-tutorial')
+
+# Scraper Tutorial
 This is a tutorial on how to use the SCALES Scraper tool to download data from PACER. 
 
 The scraper has three modules:
@@ -105,4 +114,18 @@ The Document Scraper will usually take significantly longer to run than the Dock
  - To get specific documents from specific cases, you can use the `--document-input` option to pass a *.csv* file with cases ids and list specific documents to retrieve, see the documentation for more.
 
 
-To see more specifics, options and use cases check out the detailed  documentation [here](code/downloader/README.md).
+To see more specifics, options and use cases check out the detailed documentation [here](code/downloader/README.md).
+
+# Parser Tutorial
+
+This short section explains how to use the SCALES Parser tool to read HTMLs downloaded from Pacer and convert them into JSON format. The parser takes as its input the results of running the [docket scraper](#docket-scraper) - namely, a folder of HTMLs.
+
+**Running script**
+To use the parser on the HTMLs from the docket scraper in the previous tutorial, we will simply run the following:
+
+    python parse_pacer.py ../../data/pacer/psc/html/ ../../data/pacer/psc/json/
+
+**Result**
+Once the parser has finished, all the parsed versions of the HTML files can be found in */data/pacer/psc/json*.
+
+To see more specifics, options, and details on the JSON schema, check out the detailed documentation [here](code/parsers/README.md).
