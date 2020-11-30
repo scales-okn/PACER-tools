@@ -248,7 +248,7 @@ def remap_recap_data(recap_fpath=None, rjdata=None):
                 is_pro_hac = 'PRO HAC VICE' in str(lawyer)
                 lawyer_dict[lawyer['name']] = {'office':office,'trial_bar_status':None,'is_lead_attorney':is_lead,'is_pro_hac_vice':is_pro_hac}
 
-        dicti = {'lawyers': (lawyer_dict or None), 'is_pro_se':is_pro_se}
+        dicti = {'counsel': (lawyer_dict or None), 'is_pro_se':is_pro_se}
         roles = [pt['name'] for pt in party['party_types']]
         if defendant_role in roles:
             dicti.update({'role':defendant_role})
@@ -670,7 +670,7 @@ def parse_ucid(ucid):
     if match:
         return match.groupdict()
 
-def bundle_from_list(file_list, name, mode='ucid'):
+def bundle_from_list(file_list, name, mode='ucid', notes=None, overwrite=False):
     '''
     Bundle files together from list of files
     Inputs:
@@ -685,16 +685,16 @@ def bundle_from_list(file_list, name, mode='ucid'):
     elif mode=='fpath':
         df = df[df.fpath.isin(file_list)]
 
-    bundle_from_df(df, name)
+    bundle_from_df(df, name, notes, overwrite)
 
-def bundle_from_df(df, name):
+def bundle_from_df(df, name, notes=None, overwrite=False):
     '''
         Bundle up a collection of files
         Inputs:
             - df (DataFrame): any dataframe with a fpath column
             - name (str): name of directory to bundle into (will be put in /data/{name})
     '''
-    bundler.bundler(df,name)
+    bundler.bundler(df,name, notes, overwrite)
 
 def is_recap(fpath):
     '''Determine if a case is a recap case based on the filepath'''

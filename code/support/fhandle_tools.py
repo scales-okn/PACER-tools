@@ -52,7 +52,7 @@ re_billable_pages_cost = r"Billable Pages[\s\S]+?>\s?(?P<billable_pages>\d+)\s<[
 
 # Regex Named Groups for case name
 rg = lambda k: rf"(?P<{k}>{re_com[k]})"
-re_case_no_gr = rf"{rg('office')}:{rg('year')}-{rg('case_type')}-{rg('case_no')}{rg('def_no')}{rg('judge_names')}_?{rg('update_ind')}"
+re_case_no_gr = rf"{rg('office')}:{rg('year')}-{rg('case_type')}-{rg('case_no')}{rg('judge_names')}{rg('def_no')}_?{rg('update_ind')}"
 
 re_mdl_caseno_condensed = rf"{rg('year')}-?{rg('case_type')}-?{rg('case_no')}"
 
@@ -125,10 +125,15 @@ def main_limiter(case_no):
         else:
             return True
 
-def build_case_id(decomposed_case):
+def build_case_id(decomposed_case, allow_def_stub=False):
     ''' Build a standard case_id from a decomposed case'''
     c = decomposed_case
-    return rf"{c['office']}:{c['year']}-{c['case_type']}-{c['case_no']}"
+    case_id = rf"{c['office']}:{c['year']}-{c['case_type']}-{c['case_no']}"
+
+    if allow_def_stub and c['def_no']:
+        case_id += rf"-{c['def_no']}"
+
+    return case_id
 
 def colonize(case_no):
     ''' Puts colon after office in case_no if it doesn't exist'''
@@ -139,23 +144,20 @@ def colonize(case_no):
 def decolonize(case_no):
     return case_no.replace(':', '-', 1)
 
-def clean_case_id(case_no, allow_indivs=False):
+def clean_case_id(case_no, allow_def_stub=False):
     '''
     Takes a listed case name and clean anything that isn't the office,year, case type, and case no
     Inputs:
         case_no (str): name of the case from the query
-        allow_indivs (bool): allow individual dockets e.g. {case_name}-1 for defendant 1,
-            if false returns None
+        allow_def_stub (bool): allow individual defendant docket stubs e.g. {case_name}-1 for defendant 1,
     Outputs:
         Cleaned standardised name
     '''
     case_no = colonize(case_no)
     try:
         case = decompose_caseno(case_no)
-        if not allow_indivs and case['def_no']!=None:
-            return
-        else:
-            return build_case_id(case)
+        return build_case_id(case, allow_def_stub=allow_def_stub)
+
     except ValueError:
         return case_no
 

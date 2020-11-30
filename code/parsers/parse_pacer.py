@@ -42,6 +42,7 @@ re_lead_case_id = re.compile('Lead case: <a href=[^>]*>[A-Za-z0-9:-]{1,100}')
 re_demand = re.compile('Demand: [0-9\,\$]{1,100}')
 re_other_court = re.compile('Case&nbsp;in&nbsp;other&nbsp;court:</td><td>&nbsp;[A-Za-z0-9 :;()\.\,\-]{1,100}') # brittle but functional
 re_party = re.compile('<b><u>([A-Za-z ]{1,100})(?:</u|\()')
+re_pacer_case_id = re.compile('DOCKET FOR CASE #: [A-Za-z0-9 :\-]{1,100}')
 
 WSPACE = string.whitespace+r'\xc2\xa0'
 
@@ -64,7 +65,7 @@ def re_existence_helper(obj):
 
 def line_detagger(obj):
     if obj != None:
-        while '***' in obj: # sometimes PACER does, e.g., "***DO NOT FILE IN THIS CASE***"
+        while '***' in obj: # sometimes Pacer does, e.g., "***DO NOT FILE IN THIS CASE***"
             obj = obj.split('***')[0]+obj.split('***')[2]
         return re.sub('\<[^<]+?>', '', obj).strip('<>?! ')
     else:
@@ -120,8 +121,8 @@ def fill_incomplete(dicti):
         # flatten the input dict
         lawyer_list = []
         for key in dicti.keys():
-            dicti[key]['lawyers'] = {'None':'None'} if dicti[key]['lawyers'] is None else dicti[key]['lawyers'] # make nulls safe to play with
-            lawyer_list.extend([(k,v) for k,v in dicti[key]['lawyers'].items()])
+            dicti[key]['counsel'] = {'None':'None'} if dicti[key]['counsel'] is None else dicti[key]['counsel'] # make nulls safe to play with
+            lawyer_list.extend([(k,v) for k,v in dicti[key]['counsel'].items()])
 
         # resolve 'see above' entries
         for i in range(1,len(lawyer_list)):
@@ -138,9 +139,9 @@ def fill_incomplete(dicti):
 
         # re-form the input dict
         new_dicti = dicti
-        for key, num_items in [(key, len(dicti[key]['lawyers'])) for key in dicti.keys()]:
-            new_dicti[key]['lawyers'] = dict([(k,v) for k,v in lawyer_list[0:num_items]])
-            new_dicti[key]['lawyers'] = None if new_dicti[key]['lawyers'] == {'None':'None'} else new_dicti[key]['lawyers'] # revert nulls
+        for key, num_items in [(key, len(dicti[key]['counsel'])) for key in dicti.keys()]:
+            new_dicti[key]['counsel'] = dict([(k,v) for k,v in lawyer_list[0:num_items]])
+            new_dicti[key]['counsel'] = None if new_dicti[key]['counsel'] == {'None':'None'} else new_dicti[key]['counsel'] # revert nulls
             lawyer_list = lawyer_list[num_items:]
         return new_dicti
     else:
@@ -173,7 +174,7 @@ def process_entity_and_lawyers(chunk, role):
                         office = line_cleaner(name_split[1].split('<br')[1].split('</td>')[0].strip('/<> '))
                         is_lead = True if 'LEAD ATTORNEY' in line else False
                         is_pro_hac = True if 'PRO HAC VICE' in line else False
-                        office = None if office == '.' or '@' in office else office # PACER quirks
+                        office = None if office == '.' or '@' in office else office # Pacer quirks
 
                         addtl_info = {} # fields in this dict will vary based on what sort of other info appears in the lawyer text block
                         if 'Designation' in line:
@@ -185,16 +186,16 @@ def process_entity_and_lawyers(chunk, role):
                         lawyer_dict[lawyer_name] = {'office':office,'is_lead_attorney':is_lead,'is_pro_hac_vice':is_pro_hac,'additional_info':(addtl_info or None)}
 
         #Now append the lawyer info
-        chunk_answer = {name:{'lawyers':(lawyer_dict or None), 'is_pro_se':is_pro_se, 'roles':[role]}}
+        chunk_answer = {name:{'counsel':(lawyer_dict or None), 'is_pro_se':is_pro_se, 'roles':[role]}}
     else:
         if name == '':
             name = chunk.split('</b><br />')[0].split('<b>')[-1]
-        chunk_answer = {name:{'lawyers':None, 'is_pro_se':False, 'roles':[role]}}
+        chunk_answer = {name:{'counsel':None, 'is_pro_se':False, 'roles':[role]}}
     return (name, chunk_answer)
 
 def process_entity_without_lawyers(chunk, role): # Handle a party with no lawyers listed (same i/o as process_entity_and_lawyers)
     name = line_cleaner(line_detagger( chunk.split('<b>')[1].split('</b>')[0] ))
-    chunk_answer = {name: {'lawyers':None, 'is_pro_se':False, 'roles':[role]}}
+    chunk_answer = {name: {'counsel':None, 'is_pro_se':False, 'roles':[role]}}
     return (name, chunk_answer)
 
 def process_criminal_counts(chunk, count_type):
@@ -226,7 +227,7 @@ def update_party(party_dict, name, chunk_answer):
     '''
     Update the parse structure with newly parsed info about a party, merging this info with existing info about the same party if necessary
     Inputs:
-        - party_dict (dict): one of the three dictionaries (plaintiff, defendant, other_party) containing parsed info on parties
+        - party_dict (dict): one of the five dictionaries (plaintiff, defendant, bk_party, other_party, misc) containing info on parties
         - name (str): the name of the person/corporation/etc comprising this party, to be used as a key into party_dict
         - chunk_answer (dict): the info we want to add, which (in this implementation) will be a dict returned from process_entity_and_lawyers
     Outputs:
@@ -235,10 +236,10 @@ def update_party(party_dict, name, chunk_answer):
     if name not in party_dict.keys():
         party_dict.update(chunk_answer)
     else:
-        if not bool(party_dict[name]['lawyers']):
-            party_dict[name]['lawyers'] = chunk_answer[name]['lawyers']
+        if not bool(party_dict[name]['counsel']):
+            party_dict[name]['counsel'] = chunk_answer[name]['counsel']
         else:
-            party_dict[name]['lawyers'].update(chunk_answer[name]['lawyers'] or {})
+            party_dict[name]['counsel'].update(chunk_answer[name]['counsel'] or {})
         party_dict[name]['is_pro_se'] = (party_dict[name]['is_pro_se'] or chunk_answer[name]['is_pro_se'])
         party_dict[name]['roles'] += chunk_answer[name]['roles']
     return party_dict
@@ -247,17 +248,20 @@ def process_parties_and_counts(text, is_cr):
     '''
     Parse information about a party involved in this case, as well as any charges they may be facing
     Inputs:
-        - text (str): the PACER HTML table containing info on all the parties involved in a particular case
+        - text (str): the Pacer HTML table containing info on all the parties involved in a particular case
         - is_cr (bool): flag identifying this case as a criminal case
     Outputs:
         - plaintiff (dict): info on parties with plaintiff-type roles (Plaintiff, Petitioner...)
         - defendant (dict): info on parties with defendant-type roles (Defendant, Respondent...)
-        - other_party (dict): info on parties with other roles (Amicus, Notice-Only Party...)
+        - bk_party (dict): info on parties specifically involved in bankruptcy cases (Bankruptcy Judge...)
+        - other_party (dict): info on parties with other roles (Amicus...)
+        - misc (dict): info on participants who are not party to the litigation but are listed in the Pacer party table (Expert, ADR Provider...)
         - pending_counts (dict): for criminal cases only, info on pending charges against the defendants
         - terminated_counts (dict): for criminal cases only, info on terminated charges against the defendants
+        - complaints (dict): for criminal cases only, info on the statutes specified as the basis for the charges
     '''
-    parties = {'plaintiff':{}, 'defendant':{}, 'other_party':{}}
-    pending_counts, terminated_counts = ({}, {}) if is_cr else (None, None)
+    parties = {'plaintiff':{}, 'defendant':{}, 'bk_party':{}, 'other_party':{}, 'misc':{}}
+    pending_counts, terminated_counts, complaints = ({},{},{}) if is_cr else (None,None,None)
 
     # identify party roles (i.e. bolded/underlined words), throwing out words from the criminal-counts section
     roles = set()
@@ -271,7 +275,7 @@ def process_parties_and_counts(text, is_cr):
         mappings = json.load(f)
     for role in roles:
         if role not in mappings.keys():
-            mappings[role] = {'title':role, 'type':'other_party'} # this role isn't in the dict, so spoof an entry for it
+            mappings[role] = {'title':role, 'type':'misc'} # this role isn't in the dict, so spoof an entry for it
 
     # process parties
     split = split_on_multiple_separators(text, ['<u>'+x for x in roles]) # add HTML '<u>' to weed out, e.g., 'Defendant' in disposition text
@@ -294,8 +298,10 @@ def process_parties_and_counts(text, is_cr):
             pending_counts[name] = ipc
             itc = process_criminal_counts(chunk, 'Terminated Counts')
             terminated_counts[name] = itc
+            ic = line_cleaner(chunk.split('<u>Complaints')[1].split('width="40%">')[2].split('</td>')[0])
+            complaints[name] = None if ic == 'None' else ic
 
-    return tuple(v for k,v in parties.items()) + (pending_counts, terminated_counts)
+    return tuple(v for k,v in parties.items()) + (pending_counts, terminated_counts, complaints)
 
 
 
@@ -445,7 +451,7 @@ def parse_stamp(html_text, llim=-400):
 
 def process_html_file(case_dockets, member_cases, court=None):
     '''
-    Processes a html PACER file, returns a dictionary object to be saved as JSON
+    Processes a html Pacer file, returns a dictionary object to be saved as JSON
 
     Inputs:
         - case_dockets (tuple of Path objects) - html filenames
@@ -493,7 +499,8 @@ def process_html_file(case_dockets, member_cases, court=None):
         else:
             member_cases_found = False
 
-    #Judge, filing date and terminating date are universal
+    # Some fields are universal (judge, filing date, terminating date...)
+    case_data['pacer_case_id'] = re_existence_helper( re_pacer_case_id.search(html_text) )
     case_data['filing_date'] = re_existence_helper( re_fdate.search(html_text) )
     case_data['terminating_date'] = re_existence_helper( re_tdate.search(html_text) )
     if case_data['terminating_date'] == None:
@@ -512,7 +519,7 @@ def process_html_file(case_dockets, member_cases, court=None):
     case_flags = dei.get_case_flags(html_text)
     case_data['case_flags'] = case_flags.split(",") if case_flags is not None else []
 
-    # case name, parties, counts
+    # Other fields depend on case type (case name, parties, counts...)
     if case_data['case_type'] != 'cr' and case_data['case_type'] != 'cv':
         print(f'Case type error (type = %s) with {fname}' % case_data['case_type'])
     else:
@@ -525,12 +532,15 @@ def process_html_file(case_dockets, member_cases, court=None):
             if 'no party found' not in html_text: # but just in case...
                 print(f"error parsing party table ({sys.exc_info()[0]}) in {fname}")
             party_table = None
-        p,d,o,pc,tc = (None,None,None,None,None) if party_table is None else process_parties_and_counts(party_table, is_cr)
+        p,d,bp,op,mp,pc,tc,c = (None,None,None,None,None,None,None,None) if party_table is None else process_parties_and_counts(party_table, is_cr)
         case_data['plaintiffs'] = fill_incomplete(p)
         case_data['defendants'] = fill_incomplete(d)
-        case_data['other_parties'] = fill_incomplete(o)
+        case_data['bankruptcy_parties'] = fill_incomplete(bp)
+        case_data['other_parties'] = fill_incomplete(op)
+        case_data['misc_participants'] = fill_incomplete(mp)
         case_data['pending_counts'] = pc
         case_data['terminated_counts'] = tc
+        case_data['complaints'] = c
 
     # Now the docket
     no_docket_headers = [x for x in soup.find_all('h2') if re.search(ftools.re_no_docket, x.text)]
@@ -572,7 +582,7 @@ def process_html_file(case_dockets, member_cases, court=None):
     # No of case dockets, will be 1 unless there are docket updates and it will be >1
     case_data['n_docket_reports'] = len(case_dockets)
 
-    # if we're parsing from an html, the source must be PACER (the RECAP remapper will set this field to 'recap')
+    # if we're parsing from an html, the source must be Pacer (the RECAP remapper will set this field to 'recap')
     case_data['source'] = 'pacer'
 
     # Scraper stamp data

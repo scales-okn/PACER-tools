@@ -1,11 +1,11 @@
 {
 	"ADR Limited Scope Counsel": {
 		"title": "ADR Limited Scope Counsel",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"ADR Provider": {
 		"title": "ADR Provider",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"All Defendants": {
 		"title": "All Defendants",
@@ -45,11 +45,11 @@
 	},
 	"Bankruptcy Judge": {
 		"title": "Bankruptcy Judge",
-		"type": "other_party"
+		"type": "bk_party"
 	},
 	"BK Notice Party": {
 		"title": "BK Notice Party",
-		"type": "other_party"
+		"type": "bk_party"
 	},
 	"Carrier": {
 		"title": "Carrier",
@@ -213,7 +213,7 @@
 	},
 	"Court Monitor": {
 		"title": "Court Monitor",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"Creditor": {
 		"title": "Creditor",
@@ -249,15 +249,15 @@
 	},
 	"Debtor": {
 		"title": "Debtor",
-		"type": "other_party"
+		"type": "bk_party"
 	},
 	"debtor": {
 		"title": "Debtor",
-		"type": "other_party"
+		"type": "bk_party"
 	},
 	"Debtor in Possession": {
 		"title": "Debtor in Possession",
-		"type": "other_party"
+		"type": "bk_party"
 	},
 	"Defaulted Defendant": {
 		"title": "Defaulted Defendant",
@@ -289,15 +289,15 @@
 	},
 	"Disinterested Person": {
 		"title": "Disinterested Person",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"disinterested person": {
 		"title": "Disinterested Person",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"ENE Evaluator": {
 		"title": "ENE Evaluator",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"Estate Defendant": {
 		"title": "Estate Defendant",
@@ -337,7 +337,7 @@
 	},
 	"Expert": {
 		"title": "Expert",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"Fifth Party Defendant": {
 		"title": "Fifth Party Defendant",
@@ -405,11 +405,11 @@
 	},
 	"HABEAS ATTORNEY GENERAL SERVICE LIST": {
 		"title": "Habeas Attorney General Service List",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"In Re": {
 		"title": "In Re",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"In re Debtor": {
 		"title": "In Re Debtor",
@@ -489,23 +489,23 @@
 	},
 	"Material Witness": {
 		"title": "Material Witness",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"material witness": {
 		"title": "Material Witness",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"Mediation Assistance Program Counsel": {
 		"title": "Mediation Assistance Program Counsel",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"Mediator": {
 		"title": "Mediator",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"mediator": {
 		"title": "Mediator",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"Miscellaneous": {
 		"title": "Miscellaneous Party",
@@ -605,11 +605,11 @@
 	},
 	"PLSP Attorney Appointed for Plaintiff": {
 		"title": "Prisoner Litigation Settlement Program",
-		"type": "plaintiff"
+		"type": "misc"
 	},
 	"Prisoner Litigation Settlement Program": {
 		"title": "Prisoner Litigation Settlement Program",
-		"type": "plaintiff"
+		"type": "misc"
 	},
 	"Proposed": {
 		"title": "Proposed",
@@ -637,11 +637,11 @@
 	},
 	"Recruited Counsel": {
 		"title": "Recruited Counsel",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"Referee": {
 		"title": "Referee",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"Relator": {
 		"title": "Relator",
@@ -673,7 +673,7 @@
 	},
 	"Special Mediation Counsel": {
 		"title": "Special Mediation Counsel",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"Substitute Custodian": {
 		"title": "Substitute Custodian",
@@ -689,7 +689,7 @@
 	},
 	"Technical Advisor": {
 		"title": "Technical Advisor",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"Third Party Custodian": {
 		"title": "Third Party Custodian",
@@ -717,11 +717,11 @@
 	},
 	"Trustee": {
 		"title": "Trustee",
-		"type": "other_party"
+		"type": "bk_party"
 	},
 	"Trustee in Bankruptcy": {
 		"title": "Trustee in Bankruptcy",
-		"type": "other_party"
+		"type": "bk_party"
 	},
 	"Underinsured Motorist Carrier": {
 		"title": "Underinsured Motorist Carrier",
@@ -729,11 +729,11 @@
 	},
 	"Unknown": {
 		"title": "Unknown",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"unknown": {
 		"title": "Unknown",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"Unnamed Defendant": {
 		"title": "Unnamed Defendant",
@@ -741,14 +741,14 @@
 	},
 	"US Trustee": {
 		"title": "US Trustee",
-		"type": "other_party"
+		"type": "bk_party"
 	},
 	"Witness": {
 		"title": "Witness",
-		"type": "other_party"
+		"type": "misc"
 	},
 	"witness": {
 		"title": "Witness",
-		"type": "other_party"
+		"type": "misc"
 	}
 }

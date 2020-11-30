@@ -117,7 +117,7 @@ def docket_searcher(case_paths, outfile, wide_net, patterns, computed_attrs={}, 
 
         for fpath in case_paths:
             case_rows = get_case_matches(fpath, patterns, wide_net, computed_attrs, rlim, line_match_fn)
-            print(f"<case:fpath> found {len(case_rows)} matches")
+            print(f"<case:{fpath}> found {len(case_rows)} matches")
 
             if len(case_rows):
                 # Write to file

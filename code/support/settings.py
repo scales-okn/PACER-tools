@@ -38,6 +38,7 @@ FLAGS_DF = DATAPATH / 'annotation' / 'case_flags.csv'
 
 # Misc
 CTYPES = {'cv':'civil', 'cr':'criminal' }
+STYLE = PROJECT_ROOT / 'code' / 'support' / 'style'
 
 # Dev
 SETTINGS_DEV = Path(__file__).parent / 'settings_dev.py'

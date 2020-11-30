@@ -301,6 +301,7 @@ def idb_merge(years, case_type, year_buffer=1, dframe=None):
     N = dff.shape[0]
     print(f"\n{N:,} case files provided")
 
+    # Make sure there's a ucid column
     dff.reset_index(inplace=True)
     dff['ucid_copy'] = dff['ucid']
     years.sort()
@@ -347,14 +348,6 @@ def idb_merge(years, case_type, year_buffer=1, dframe=None):
     print(f"Overall match rate: {match_rate :.2%}")
 
     return final, match_rate
-
-# def idb_aggfunc(cols):
-#     '''Agg function for idb duplicates, takes first of everything except termdate (max)'''
-#     def get_first(row):
-#         return row.iloc[0]
-#     agg = {k: get_first for k in cols}
-#     agg['termdate'] = max
-#     return agg
 
 def _update_case_(row, indent):
     '''
