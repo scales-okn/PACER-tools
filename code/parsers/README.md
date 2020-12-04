@@ -4,7 +4,7 @@ A parser that reads HTMLs downloaded from Pacer.gov and breaks them up into JSON
 # Usage
 To run the parser:
 
-    python scrapers.py [OPTIONS] INPATH OUTPATH
+    python parse_pacer.py [OPTIONS] INPATH OUTPATH
     
 ### Arguments
  - `INPATH`: Relative path to the folder where HTMLs will be read, e.g.   `../../data/pacer/ilnd/html`.
@@ -26,7 +26,7 @@ Two shell scripts, `parse_all.sh` and `parse_subset.sh`, are provided for batch 
     
 where `INPATH` is the relative path to a parent folder containing multiple court directories, `STARTDIR` and `ENDDIR` define the inclusive alphabetical range of court directories to parse (e.g. `nyed` through `nywd`), and `OPTIONS` are any command-line options you would like to pass through to `parse_pacer.py` (e.g. `--debug`, `--force-rerun`, `--n-workers`).
 
-*Note: each court directory in the batch must include an HTML folder for input and a JSON folder for output, as occurs in the scraper-generated directory structure.*
+*Note: each court directory in the batch must include an HTML folder for input and a JSON folder for output, as is true in the scraper-generated directory structure.*
 
 # JSON Schema
 The following fields are inferenced from the filepath:
@@ -65,13 +65,13 @@ The following fields are pulled from the body of the Pacer docket:
 - `pending_counts`, `terminated_counts` *(dictionary)* - criminal cases only; each key is the name of a party who was charged with a criminal count, and each value is a list in which each element has the following dictionary structure:
   - `counts` *(string)*
   - `disposition` *(string)*
-- `complaints` *(dictionary)* - criminal cases only; each key is the name of a party who was charged with a criminal count, and each value is the statute(s) specified as the basis of the charges
+- `complaints` *(dictionary)* - certain criminal cases only; each key is the name of a party who was charged with a criminal count, and each value is the statute(s) specified as the basis of the charges
 - `docket_available` *(boolean)*
 - `docket` *(list of dictionaries)* - contains one item per docket entry, structured as follows:
   - `date_filed` *(string)*
   - `ind` *(string)* - Pacer's numerical index for this entry (can be an empty string, as not all Pacer entries are numbered)
   - `docket_text` *(string)*
-  - `links` *(dictionary)* - each key is either a non-zero attachment number or 0 for the main 'line document', and each value is a link to a Pacer document
+  - `links` *(dictionary)* - each key is either a non-zero attachment number or 0 for the main document, and each value is a one-element dictionary in which the key ('url') maps to a Pacer document link
 
 The following fields are not pulled directly from the Pacer docket, and are primarily meant for internal use:
 - `mdl_id_source` *(string)* - the origin of `mdl_code` (either 'lead_case_id' or 'flags')
