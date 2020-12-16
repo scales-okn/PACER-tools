@@ -71,7 +71,10 @@ The following fields are pulled from the body of the Pacer docket:
   - `date_filed` *(string)*
   - `ind` *(string)* - Pacer's numerical index for this entry (can be an empty string, as not all Pacer entries are numbered)
   - `docket_text` *(string)*
-  - `links` *(dictionary)* - each key is either a non-zero attachment number or 0 for the main document, and each value is a one-element dictionary in which the key ('url') maps to a Pacer document link
+  - `documents` *(dictionary)* - each key is either a non-zero attachment number or '0' for the main document, and each value is a dictionary with the following structure:
+    - `url` *(string)* - the Pacer URL for this document
+    - `span` *(dictionary)* - the starting and ending indices (within `docket_text`) of the hyperlink to the document, formatted as a dictionary with keys `start` and `end`
+  - `edges` *(list of tuples)* - each element is a three-value tuple (encoded in graph-edge format) representing a hyperlink between two docket entries, with the first value encoding the index of the source entry within `docket`, the second value encoding the index of the target entry, and the third value encoding the starting and ending indices of the hyperlink within `docket_text` (as specified in `span` above)
 
 The following fields are not pulled directly from the Pacer docket, and are primarily meant for internal use:
 - `mdl_id_source` *(string)* - the origin of `mdl_code` (either 'lead_case_id' or 'flags')
