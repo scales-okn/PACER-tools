@@ -13,3 +13,4 @@ noacri.db
 **/_temp_/*
 code/downloader/test/*
 **/geckodriver.log
+node_modules/*

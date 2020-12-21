@@ -42,7 +42,7 @@ def identify_judge(docket_block):
 
     judge_names = []
     for dline in docket_block:
-        doc = nlp(dline[-1])
+        doc = nlp(dline['docket_text'])
         for ent in doc.ents:
             if ent.label_ == 'PERSON':
                 if doc[ent.start-1].text in honorifics:
@@ -69,7 +69,7 @@ def check_docket(dlines):
     '''
     #handle the check
     if len(dlines)>0:
-        entry_text = string_sanitizer(dlines[0][-1])
+        entry_text = string_sanitizer(dlines[0]['docket_text'])
     else:
         entry_text = ''
     #Conditions on transfers
@@ -77,9 +77,9 @@ def check_docket(dlines):
         return False
     elif 'EXECUTIVE COMMITTEE ORDER' in entry_text:
         return False
-    elif len([x for x in dlines if type(x[-1])==float])>0:
+    elif len([x for x in dlines if type(x['docket_text'])==float])>0:
         return False
-    elif len([x for x in dlines if 'clerical error' in x[-1]])>0:
+    elif len([x for x in dlines if 'clerical error' in x['docket_text']])>0:
         return False
     elif 'in error' in entry_text:
         return False
@@ -297,7 +297,7 @@ def identify_judge_entriesv1(jfhandle = None, docket = None, djudge = ''):
     transfer_indices = []
     if dcheck:
         for i, dline in enumerate(docket):
-            if transfer_phrase in dline[-1]:
+            if transfer_phrase in dline['docket_text']:
                 transfer_indices.append(i)
     #If there are transfers, divide it up
     if transfer_indices != []:
@@ -329,13 +329,13 @@ def identify_judge_entriesv1(jfhandle = None, docket = None, djudge = ''):
         wrong_assignment=False
         for dline in docket:
             try:
-                if 'assigned in error' in dline[-1]:
+                if 'assigned in error' in dline['docket_text']:
                     wrong_assignment = True
-                elif 'assigned' in dline[-1] and 'in error' in dline[-1]:
+                elif 'assigned' in dline['docket_text'] and 'in error' in dline['docket_text']:
                     wrong_assignment = True
-                elif 'clerical error' in dline[-1]:
+                elif 'clerical error' in dline['docket_text']:
                     wrong_assignment = True
-                elif 'shall not be used for any other proceeding' in dline[-1]:
+                elif 'shall not be used for any other proceeding' in dline['docket_text']:
                     wrong_assignment = True
             except TypeError:
                 #Type error is a suppressed case
@@ -390,13 +390,13 @@ def identify_judge_entries(jfhandle = None, docket = None):
     judge_track = []
     for i, dline in enumerate(docket):
         # If it's a string and not odd formatting
-        if type(dline[-1]) == str:
+        if type(dline['docket_text']) == str:
             #Find the names and titles
-            doc = jnlp(dline[-1])
+            doc = jnlp(dline['docket_text'])
             #pull out the judge ents
             judge_ents = [ent for ent in doc.ents if ent.label_ == 'JUDGE' and ent.text not in exclusions]
             #Append the identified name
-            judge_track.append( assign_entry_to_judge(dline[-1], judge_ents, dentry_index=i) )
+            judge_track.append( assign_entry_to_judge(dline['docket_text'], judge_ents, dentry_index=i) )
     #Backfill code
     judge_track = backfill_judge_assignment(judge_track)
     return judge_track
@@ -499,203 +499,204 @@ def mdl_code_from_casename(casename):
     if casename_data['case_type'].lower() in ['md','ml', 'mdl']:
         return int(casename_data['case_no'])
 
-def get_mdl_code(mdl_data, html_string=None, case=None):
-    '''
-    Identify the mdl_code for a case. Must supply either html_string or case
-
-    Inputs:
-        fpath (str or Path): filepath for the case
-        mdl_data (dict): the output from mdl_check method
-        html_string (str): the html string for the case
-        case (dict): the case json data from dtools.load_case
-    Output:
-        code (int): the mdl code
-        source_code (str): the source used to identify the code
-    '''
-
-    if not (html_string or case):
-        raise ValueError('Must supply either html_string or case')
-
-
-    # Check lead case
-    lead_case_id = mdl_data.get('lead_case_id')
-    if lead_case_id:
-        code = mdl_code_from_casename(lead_case_id)
-        if code:
-            return (code, 'lead_case_id')
-
-    # Check html for flags or other reference
-    if html_string:
-        flags = get_case_flags(html_string)
-        if flags:
-            code = mdl_code_from_string(flags)
-            if code:
-                return (code, 'flag')
-
-        # Check rest of html for string
-        code = mdl_code_from_string(html_string)
-        if code:
-            return  (code, 'html_string')
-
-    elif case:
-        # Check idb_mdl
-        code = case.get('mdl_code')
-        if code:
-            return (code, 'idb_mdl_docket')
-        # Check if it's an mdl case
-        casename = case.get('case_id')
-        code = mdl_code_from_casename(casename)
-        if code:
-            return (code, 'casename')
-
-        # Search the docket
-        docket = case.get('docket')
-
-        if docket and len(docket[0])==3:
-            try:
-                for line in docket:
-                    code = mdl_code_from_string(line[2])
-                    if code:
-                        return (code, 'docket')
-            except:
-                pass
-
-    return None,None
-
-def identify_mdl_from_json_data(case):
-    ''' MDL identification based on idb fields in case json and from docket lines'''
-    is_multi_idb = (case['origin'] in [6,13] or case['disposition']==10 or case['mdl_docket'])
-    if is_multi_idb:
-        mdl_data = {
-            'is_multi': True,
-            'origin': 'internal' if case['origin']==13 else \
-                       'external' if case['origin']==6 else None,
-            'disposition': (case['disposition']==10), # disposed of by mdl,
-            'mdl_docket_no': case['mdl_docket'],
-            'recap_mdl_status': case['mdl_status'],
-            'source_identification': 'json'
-        }
-    else:
-        mdl_data = {'is_multi': False}
-
-    # Check for code regardless (may identify based on docket)
-    mdl_data['mdl_code'], mdl_data['source_code']= get_mdl_code(mdl_data, case=case)
-    # Coerce is_multi, make it true if mdl_code found
-    mdl_data['is_multi'] = mdl_data['is_multi'] or  (mdl_data['mdl_code'] != None)
-
-    return mdl_data
-
-def identify_mdl_from_html(html):
-    ''' MDL identification based on case html'''
-
-    def id_from_atag(tag_string):
-        ''' Get the case no. from within an <a> tag '''
-        return tag_string.split('</a>')[0].split('>')[-1]
-
-
-    idx_filed = html.index('date filed')
-    re_mdl_flag = "(?<![a-z])mdl(?![a-z])"
-    case_flags = get_case_flags(html)
-    flag_found = bool(re.search(re_mdl_flag, get_case_flags(html), re.I)) if case_flags else False
-
-    if not (flag_found or re.search('member cases?|case in other court', html[:idx_filed])):
-        return {'is_multi': False}
-
-    # Start from member cases link to avoid lead case
-    try:
-        idx_member = html.index('member case')
-        truncated_member_list = bool(re.search(ftools.re_members_truncated, html[idx_member:idx_filed], re.I) )
-        member_cases = [id_from_atag(atag) for atag in re.findall(ftools.re_case_link, html[idx_member:idx_filed], re.I)]
-        has_member_cases = truncated_member_list or len(member_cases)
-
-        lead_case_link = re.search(ftools.re_lead_link, html[:idx_filed], re.I)
-        lead_case_id = id_from_atag(lead_case_link.group()) if lead_case_link else None
-    except ValueError:
-        member_cases, lead_case_link, lead_case_id = None,None,None
-        has_member_cases = False
-
-    # Get the "Case in other court: {court}, {case} data"
-    other_court_line_match = re.search(ftools.re_other_court, html[:idx_filed], re.I)
-    if other_court_line_match:
-        try:
-            # Extract the text
-            other_court_line = other_court_line_match.group().split('</td>')[-2].split('<td>')[-1].strip()
-            # Separate the court from the case no.
-            vals = [x.strip() for x in other_court_line.split(',')[-2:]]
-            other_court_court, other_court_case = vals
-        except ValueError:
-            other_court_court, other_court_case = None, vals[0]
-    else:
-        other_court_court, other_court_case = None, None
-
-    mdl_data = {
-        'is_multi': True,
-        'is_lead_case': (lead_case_id==None and has_member_cases),
-        'has_member_cases': has_member_cases,
-        'member_cases': member_cases,
-        'lead_case_id': lead_case_id,
-        'in_other_courts': bool(other_court_line_match),
-        'other_court_court': other_court_court,
-        'other_court_case': other_court_case,
-        'source_identification': 'html' if not flag_found else 'flag'
-    }
-
-    mdl_data['mdl_code'], mdl_data['source_code'] = get_mdl_code(mdl_data, html_string=html)
-    return mdl_data
-
-def mdl_check(fpath, case_jdata=None):
-    '''
-    Check if a case is an MDL case and return relevant data
-
-    Inputs:
-        fpath (str): the case fpath
-    Outputs:
-        mdl_data (dict) : data relating to the mdl
-    '''
-
-    def exclude(mdl_data):
-        ''' Scenario where a multi case is excluded from being an mdl'''
-        return  mdl_data.get('in_other_courts') \
-                and not mdl_data.get('has_member_cases',False) \
-                and not mdl_data.get('lead_case_id')
-
-    # Recap
-    if dtools.is_recap(fpath):
-        case_jdata = dtools.load_case(fpath) if not case_jdata else case_jdata
-        mdl_data = identify_mdl_from_json_data(case_jdata)
-
-    # Pacer
-    else:
-
-        # Try html first
-        case_html = dtools.load_case(fpath, html=True).replace('&nbsp;', ' ').lower()
-        mdl_data_html = identify_mdl_from_html(case_html)
-        if mdl_data_html['is_multi'] and mdl_data_html['mdl_code']:
-            mdl_data = mdl_data_html
-        else:
-            # Then try idb from json
-            case_jdata = dtools.load_case(fpath) if not case_jdata else case_jdata
-            mdl_data_json = identify_mdl_from_json_data(case_jdata)
-            if mdl_data_json['is_multi'] and mdl_data_json['mdl_code']:
-                mdl_data = mdl_data_json
-
-            # Otherwise: aggregate, prioritise html data
-            else:
-                mdl_data = mdl_data_html
-                # Make sure is_multi returns true if either is true
-                mdl_data['is_multi'] = mdl_data_html['is_multi'] or mdl_data_json['is_multi']
-                mdl_data['source_identification'] = mdl_data_html.get('source_identification')  or mdl_data_json.get('source_identification')
-
-    # is_mdl true if identification comes from a flag
-    if mdl_data.get('source_identification')=='flag' or mdl_data.get('source_code')=='flag':
-        mdl_data['is_mdl'] = True
-
-    # Otherwise look at exclusion rule
-    else:
-        mdl_data['is_mdl'] = mdl_data['is_multi'] and not exclude(mdl_data)
-
-    return mdl_data
-
+# MDL deprectated?
+# def get_mdl_code(mdl_data, html_string=None, case=None):
+#     '''
+#     Identify the mdl_code for a case. Must supply either html_string or case
+#
+#     Inputs:
+#         fpath (str or Path): filepath for the case
+#         mdl_data (dict): the output from mdl_check method
+#         html_string (str): the html string for the case
+#         case (dict): the case json data from dtools.load_case
+#     Output:
+#         code (int): the mdl code
+#         source_code (str): the source used to identify the code
+#     '''
+#
+#     if not (html_string or case):
+#         raise ValueError('Must supply either html_string or case')
+#
+#
+#     # Check lead case
+#     lead_case_id = mdl_data.get('lead_case_id')
+#     if lead_case_id:
+#         code = mdl_code_from_casename(lead_case_id)
+#         if code:
+#             return (code, 'lead_case_id')
+#
+#     # Check html for flags or other reference
+#     if html_string:
+#         flags = get_case_flags(html_string)
+#         if flags:
+#             code = mdl_code_from_string(flags)
+#             if code:
+#                 return (code, 'flag')
+#
+#         # Check rest of html for string
+#         code = mdl_code_from_string(html_string)
+#         if code:
+#             return  (code, 'html_string')
+#
+#     elif case:
+#         # Check idb_mdl
+#         code = case.get('mdl_code')
+#         if code:
+#             return (code, 'idb_mdl_docket')
+#         # Check if it's an mdl case
+#         casename = case.get('case_id')
+#         code = mdl_code_from_casename(casename)
+#         if code:
+#             return (code, 'casename')
+#
+#         # Search the docket
+#         docket = case.get('docket')
+#
+#         if docket and len(docket[0])==3:
+#             try:
+#                 for line in docket:
+#                     code = mdl_code_from_string(line[2])
+#                     if code:
+#                         return (code, 'docket')
+#             except:
+#                 pass
+#
+#     return None,None
+#
+# def identify_mdl_from_json_data(case):
+#     ''' MDL identification based on idb fields in case json and from docket lines'''
+#     is_multi_idb = (case['origin'] in [6,13] or case['disposition']==10 or case['mdl_docket'])
+#     if is_multi_idb:
+#         mdl_data = {
+#             'is_multi': True,
+#             'origin': 'internal' if case['origin']==13 else \
+#                        'external' if case['origin']==6 else None,
+#             'disposition': (case['disposition']==10), # disposed of by mdl,
+#             'mdl_docket_no': case['mdl_docket'],
+#             'recap_mdl_status': case['mdl_status'],
+#             'source_identification': 'json'
+#         }
+#     else:
+#         mdl_data = {'is_multi': False}
+#
+#     # Check for code regardless (may identify based on docket)
+#     mdl_data['mdl_code'], mdl_data['source_code']= get_mdl_code(mdl_data, case=case)
+#     # Coerce is_multi, make it true if mdl_code found
+#     mdl_data['is_multi'] = mdl_data['is_multi'] or  (mdl_data['mdl_code'] != None)
+#
+#     return mdl_data
+#
+# def identify_mdl_from_html(html):
+#     ''' MDL identification based on case html'''
+#
+#     def id_from_atag(tag_string):
+#         ''' Get the case no. from within an <a> tag '''
+#         return tag_string.split('</a>')[0].split('>')[-1]
+#
+#
+#     idx_filed = html.index('date filed')
+#     re_mdl_flag = "(?<![a-z])mdl(?![a-z])"
+#     case_flags = get_case_flags(html)
+#     flag_found = bool(re.search(re_mdl_flag, get_case_flags(html), re.I)) if case_flags else False
+#
+#     if not (flag_found or re.search('member cases?|case in other court', html[:idx_filed])):
+#         return {'is_multi': False}
+#
+#     # Start from member cases link to avoid lead case
+#     try:
+#         idx_member = html.index('member case')
+#         truncated_member_list = bool(re.search(ftools.re_members_truncated, html[idx_member:idx_filed], re.I) )
+#         member_cases = [id_from_atag(atag) for atag in re.findall(ftools.re_case_link, html[idx_member:idx_filed], re.I)]
+#         has_member_cases = truncated_member_list or len(member_cases)
+#
+#         lead_case_link = re.search(ftools.re_lead_link, html[:idx_filed], re.I)
+#         lead_case_id = id_from_atag(lead_case_link.group()) if lead_case_link else None
+#     except ValueError:
+#         member_cases, lead_case_link, lead_case_id = None,None,None
+#         has_member_cases = False
+#
+#     # Get the "Case in other court: {court}, {case} data"
+#     other_court_line_match = re.search(ftools.re_other_court, html[:idx_filed], re.I)
+#     if other_court_line_match:
+#         try:
+#             # Extract the text
+#             other_court_line = other_court_line_match.group().split('</td>')[-2].split('<td>')[-1].strip()
+#             # Separate the court from the case no.
+#             vals = [x.strip() for x in other_court_line.split(',')[-2:]]
+#             other_court_court, other_court_case = vals
+#         except ValueError:
+#             other_court_court, other_court_case = None, vals[0]
+#     else:
+#         other_court_court, other_court_case = None, None
+#
+#     mdl_data = {
+#         'is_multi': True,
+#         'is_lead_case': (lead_case_id==None and has_member_cases),
+#         'has_member_cases': has_member_cases,
+#         'member_cases': member_cases,
+#         'lead_case_id': lead_case_id,
+#         'in_other_courts': bool(other_court_line_match),
+#         'other_court_court': other_court_court,
+#         'other_court_case': other_court_case,
+#         'source_identification': 'html' if not flag_found else 'flag'
+#     }
+#
+#     mdl_data['mdl_code'], mdl_data['source_code'] = get_mdl_code(mdl_data, html_string=html)
+#     return mdl_data
+#
+# def mdl_check(fpath, case_jdata=None):
+#     '''
+#     Check if a case is an MDL case and return relevant data
+#
+#     Inputs:
+#         fpath (str): the case fpath
+#     Outputs:
+#         mdl_data (dict) : data relating to the mdl
+#     '''
+#
+#     def exclude(mdl_data):
+#         ''' Scenario where a multi case is excluded from being an mdl'''
+#         return  mdl_data.get('in_other_courts') \
+#                 and not mdl_data.get('has_member_cases',False) \
+#                 and not mdl_data.get('lead_case_id')
+#
+#     # Recap
+#     if dtools.is_recap(fpath):
+#         case_jdata = dtools.load_case(fpath) if not case_jdata else case_jdata
+#         mdl_data = identify_mdl_from_json_data(case_jdata)
+#
+#     # Pacer
+#     else:
+#
+#         # Try html first
+#         case_html = dtools.load_case(fpath, html=True).replace('&nbsp;', ' ').lower()
+#         mdl_data_html = identify_mdl_from_html(case_html)
+#         if mdl_data_html['is_multi'] and mdl_data_html['mdl_code']:
+#             mdl_data = mdl_data_html
+#         else:
+#             # Then try idb from json
+#             case_jdata = dtools.load_case(fpath) if not case_jdata else case_jdata
+#             mdl_data_json = identify_mdl_from_json_data(case_jdata)
+#             if mdl_data_json['is_multi'] and mdl_data_json['mdl_code']:
+#                 mdl_data = mdl_data_json
+#
+#             # Otherwise: aggregate, prioritise html data
+#             else:
+#                 mdl_data = mdl_data_html
+#                 # Make sure is_multi returns true if either is true
+#                 mdl_data['is_multi'] = mdl_data_html['is_multi'] or mdl_data_json['is_multi']
+#                 mdl_data['source_identification'] = mdl_data_html.get('source_identification')  or mdl_data_json.get('source_identification')
+#
+#     # is_mdl true if identification comes from a flag
+#     if mdl_data.get('source_identification')=='flag' or mdl_data.get('source_code')=='flag':
+#         mdl_data['is_mdl'] = True
+#
+#     # Otherwise look at exclusion rule
+#     else:
+#         mdl_data['is_mdl'] = mdl_data['is_multi'] and not exclude(mdl_data)
+#
+#     return mdl_data
+#
 def scrub_tags(html_string):
     ''' Remove all html tags from a string of html source string'''
     return re.sub(r"<[\s\S]+?>", '', html_string)

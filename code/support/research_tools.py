@@ -126,3 +126,30 @@ def docket_searcher(case_paths, outfile, wide_net, patterns, computed_attrs={}, 
                     writer.writerow(row_dict[k] for k in headers)
 
     print(f'Docket Searcher complete, results located at {outfile}')
+
+def make_spacy_spans(row_series, pat_cols):
+    ''' Convert a row from docket searcher output to a spaCy span-like output
+    Inputs:
+        - row_series(pd.Series): a pandas series/row
+        - pat_cols (list): list of str of column names in row_series that are pattern columns
+    Output:
+        (list of dicts) with start, end, label keys
+
+    Example:
+
+        row_series =
+            ucid #####
+            year ######
+            pat1 (10,15)
+            pat2 (30,40)
+
+        pat_cols = ['pat1', 'pat2']
+
+        output: [
+                    {'start':10, 'end':15, 'label':'pat1'},
+                    {'start':30, 'end':40, 'label':'pat2'}
+                ]
+
+
+    '''
+    return [{'start':int(v[0]), 'end':int(v[1]), 'label':k} for k,v in row_series[pat_cols].iteritems() if v]

@@ -118,20 +118,24 @@ def bundler(indf, name, notes=None, overwrite=False, anno_col=None):
 
     print(f"\nFiles Succesfully bundled into {bundle_dir}")
 
-def build_new_td(soup, json_text, row_annotations):
+def build_new_td(json_text, row_annotations, soup=None, inner_html=False):
     '''
     Make a new td cell to replace current docket text td cell, for a single docket entry/row
 
     Inputs:
-        - soup (bs4 object): soup of the entire new page being constructed
-        - jdata_text (str): the docket_text from the saved json
-        - row_annotations (dict): a list of dicts of annotation spans for a single docket line
+        - json_text (str): the cleaned docket text from the saved json
+        - row_annotations (list): a list of dicts of annotation spans for a single docket line
                                  e.x. [{'start': 0, 'end':10, 'label':"SOMETHING"}]
+        - soup (bs4 instance): soup needed to make a tag, if None will create an empty soup
+        - inner_html (bool): if true returns inner html as string
     Output
-        new_td (bs4 object): new td cell to be inserted
+        new_td (bs4 object or str): new td cell to be inserted
     '''
+    if not soup:
+        soup = BeautifulSoup('','html.parser')
 
     new_td = soup.new_tag('td')
+
     # Index pointer to current place in original json
     og_pointer = 0
 
@@ -155,7 +159,10 @@ def build_new_td(soup, json_text, row_annotations):
     # Get the last bit of the docket
     new_td.append( json_text[ og_pointer: ] )
 
-    return new_td
+    if inner_html:
+        return new_td.decode_contents()
+    else:
+        return new_td
 
 def make_annotated_docket(html_text, json_data, case_annotations):
     '''
@@ -192,7 +199,7 @@ def make_annotated_docket(html_text, json_data, case_annotations):
         row_annotations = case_annotations[str(row_index)]
 
         # Build and inject new td
-        new_cell = build_new_td(soup, jdata_text, row_annotations)
+        new_cell = build_new_td(jdata_text, row_annotations, soup)
         docket_entry_td.replace_with(new_cell)
 
 

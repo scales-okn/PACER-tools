@@ -1,5 +1,7 @@
 
 
+
+
 # Description
 A collection of web scrapers to download data from Pacer.gov.
 The `scraper.py` script contains three scraper modules:
@@ -152,6 +154,9 @@ A relative path that is the input for the Docket Scraper module: this can be a s
 	 - `avoid`: Do not include them in a report if the current case was previously seen listed as a member case in a previously downloaded docket
 	 - `never`: Never include them in reports
 
+- `--docket-exclude-parties`
+If True, 'Parties and counsel' and 'Terminated parties' will be excluded from docket reports (this reduces the page count for the docket report so can reduce costs).
+
  - `-ex, --docket-exclusions`
 Relative path to a csv file with a column of UCIDs that are cases to be excluded from the Docket Scraper.
 
@@ -181,7 +186,7 @@ When giving the Document Scraper specific dockets to download, you can also spec
 
  1. Line documents: these are documents that relate to the whole line in the docket report, the links for these documents appear in the # column of the report table.
  2. Attachments: these are attachments or exhibits included in the line, they are referenced in-line in the docket entry text.
- 
+
 *Note: Many docket entries contain links with references to documents from previous lines. These are ignored and not treated as attachments. To download these, refer to their original line.*
 
 To specify specific documents to be downloaded, give the `--document-input` argument a csv that has both a *ucid* and a *doc_no* column. The *doc_no* column is a column where you can give a comma delimited list of documents to download. The following are valid individual values:
@@ -198,6 +203,30 @@ Notes:
  - If no *doc_no* column present in the csv, all documents will be download for each of the given cases
  - If *doc_no* column present and there is a row with a case that has no value (empty string)  specified for doc_no, **all** documents will be downloaded for that case.
  - The no. or index corresponds to the # column in the docket table, which may be out of order.
+
+### Specific defendants
+For criminal cases, there may be separate dockets/stubs for defendants if there are multiple defendants. To download a docket for a specific defendant you can supply a `def_no` column in the docket input csv. In this column, any blank value will be interpreted as getting the main docket. If the `def_no` column is excluded, the scraper will pull the main docket for every case.
+
+For example
+
+*/docket_update.csv*
+```
+ucid,def_no
+ilnd;;1:16-cr-12345,2
+ilnd;;1:16-cr-12345,3
+ilnd;;1:16-cr-12346,
+ilnd;;1:16-cr-12347,4
+```
+Running the following
+
+    python scrapers.py -m docket
+    --docket-input <path_to_file>/docket_update.csv --docket-update <path_to_ilnd_folder>
+
+Will pull the following dockets:
+
+ - *ilnd;;1:16-cr-12345*: The docket for defendants 2 and 3
+ - *ilnd;;1:16-cr-12346*: The main docket
+ - *ilnd;;1:16-cr-12347*: The docket for defendant 4
 
 ## Common tasks
   ### 1. Run a search query from start to finish
@@ -230,7 +259,7 @@ python scraper.py -m document -a <path_to_auth_file> -c ilnd --document-input <p
 
 ### 3. Update dockets
 
-To run a docket update, you need to give a csv file to the  `--docket-input` argument and also use the 
+To run a docket update, you need to give a csv file to the  `--docket-input` argument and also use the
 `--docket-update` flag. For example, the following csv:
 
 */docket_update.csv*
@@ -266,7 +295,7 @@ ilnd;;1:16-cv-03632
 
 To run this
 
-    python scrapers.py -m document 
+    python scrapers.py -m document
     --document-input <path_to_file>/document_downloads.csv
      <path_to_ilnd_folder>
 When it runs the document downloader will download the following:

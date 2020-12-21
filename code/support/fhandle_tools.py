@@ -39,7 +39,7 @@ re_com = {
     'case_no': r"[0-9]{3,10}",
     'def_no': r"(?:-[0-9]{1,3})?",
     'href': r'''["']/cgi-bin/DktRpt.pl\?[0-9]{1,10}['"]''',
-    'judge_names': r"(?:-[A-Za-z]{2,4}){0,3}",
+    'judge_names': r"(?:-{1,2}[A-Za-z]{1,4}){0,3}",
     'update_ind': r"\d*"
 }
 
@@ -68,7 +68,7 @@ def decompose_caseno(case_no, pattern=re_case_no_gr):
         raise ValueError(f"case_no supplied ({case_no})was not in the expected format, see re_case_no_gr")
     else:
         data = match.groupdict()
-        judges = data['judge_names'].strip('-').split('-') if data.get('judge_names','') != '' else None
+        judges = data['judge_names'].strip('-').replace('--','-').split('-') if data.get('judge_names','') != '' else None
         data['judge_names'] = judges
         data['def_no'] = data['def_no'].lstrip('-') if data.get('def_no','') != '' else None
         return data
@@ -85,11 +85,12 @@ def case2file(case_name, ind=None):
     else:
         return f"{case_name.replace(':','-')}_{ind}.html"
 
-def generate_docket_filename(case_name, ind=None, ext='html'):
+def generate_docket_filename(case_name, def_no=None, ind=None, ext='html'):
     '''
     Generate filename for dockets (to supercede)
     Inputs:
         - case_name (str): the case name/no, can handle: colon or no colon, trailing judges initials, file extension)
+        - def_no (str or int): defendant no.
         - ind (int): index, use for docket updates when there are multiple htmls for same case
         - ext (str): generally 'html' or 'json'
     Output:
@@ -103,10 +104,13 @@ def generate_docket_filename(case_name, ind=None, ext='html'):
     case_name = decolonize(case_name)
     ext = ext.lstrip('.')
 
+    base = f"{case_name}"
+    if def_no:
+        base += f"-{def_no}"
     if ind:
-        return f"{case_name}_{ind}.{ext}"
-    else:
-        return f"{case_name}.{ext}"
+        base += f"_{ind}"
+
+    return f"{base}.{ext}"
 
 def main_limiter(case_no):
     '''
@@ -128,7 +132,7 @@ def main_limiter(case_no):
 def build_case_id(decomposed_case, allow_def_stub=False):
     ''' Build a standard case_id from a decomposed case'''
     c = decomposed_case
-    case_id = rf"{c['office']}:{c['year']}-{c['case_type']}-{c['case_no']}"
+    case_id = rf"{c['office']}:{c['year']}-{c['case_type']}-{c['case_no']:0>5}"
 
     if allow_def_stub and c['def_no']:
         case_id += rf"-{c['def_no']}"
@@ -357,7 +361,12 @@ def doc_id_from_pdf_header(fpath):
     with open(fpath, 'rb') as f:
         pdf = pp.PdfFileReader(f, 'rb')
         stamp = pdf.getPage(0).extractText()
-        parsed = re.search(re_header,stamp).groupdict()
+
+        #Edge case of document without stamp
+        try:
+            parsed = re.search(re_header,stamp).groupdict()
+        except:
+            return None,None,None
 
     return parsed['case_no'], parsed['row_ind'], parsed['att_ind']
 
@@ -373,6 +382,9 @@ def get_correct_document_id(fpath, court):
 
     '''
     case_no, row_ind, att_ind = doc_id_from_pdf_header(fpath)
+
+    if (not case_no) or (not row_ind):
+        return None
 
     ucid = dtools.ucid(court, case_no)
     return generate_document_id(ucid, row_ind, att_ind)
@@ -455,5 +467,24 @@ def get_pacer_url(court, page):
     elif page == 'docket':
         return base_url + "cgi-bin/DktRpt.pl"
     elif page == 'doc_link':
-        return base_url + 'doc1/'
+        return base_url + 'doc1'
+    elif page == 'possible_case':
+        return base_url + 'cgi-bin/possible_case_numbers.pl'
 
+def get_expected_path(ucid, ext='json', pacer_path=settings.PACER_PATH, def_no=None):
+    ''' Find the expected path of the json file for the case
+
+    Inputs:
+        - ucid (str): case ucid
+        - ext (str): 'json' or 'html'
+        - pacer_path (Path): path to pacer data directory
+    Output:
+        (Path) the path to where the file should exist (regardless of whether it does or not)
+
+    '''
+
+    ucid_data = dtools.parse_ucid(ucid)
+    court, case_no = ucid_data['court'], ucid_data['case_no']
+    fname = generate_docket_filename(case_no, ext=ext, def_no=def_no)
+
+    return pacer_path / court / ext / fname

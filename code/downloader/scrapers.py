@@ -10,9 +10,10 @@ from hashlib import md5
 from pathlib import Path
 
 import click
+import xmltodict
 import pandas as pd
 from bs4 import BeautifulSoup
-from selenium.webdriver import Firefox
+from seleniumrequests import Firefox
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from downloader import forms
@@ -52,6 +53,37 @@ def check_time_continue(start=stools.PACER_HOURS_START, end=stools.PACER_HOURS_E
         return False
     else:
          return True
+
+def get_xml_response(browser, request_url, request_type='GET'):
+    '''
+    Get an xml request response as a dict
+
+    Inputs:
+        - browser (Selenium browser instance)
+        - request_url (str): url to request
+        - request_type (str): request type
+    Output:
+        - response ('error', 'not_logged_in', 'missing','success')
+
+        - content (dict) a dictionary representation of the xml reponse,
+            returns False if no response or login error
+            returns None if response is that cannot find case
+    '''
+    content = {}
+    resp = browser.request(request_type, request_url)
+
+    if resp.status_code != 200:
+        response = 'error'
+    elif 'Not logged in' in resp.content.decode():
+        response = 'not_logged_in'
+    elif 'Cannot find' in resp.content.decode():
+        response = 'missing'
+    else:
+        response = 'success'
+        # Remove the @-prefix for attributes, convert to dict via json
+        content = json.loads(json.dumps(xmltodict.parse(resp.content)).replace('"@','"'))
+
+    return response, content
 
 class PacerCourtDir:
     ''' A court-specific download folder
@@ -145,15 +177,86 @@ class CoreScraper:
         logout_url = ftools.get_pacer_url(self.court, 'logout')
         self.browser.get(logout_url)
 
-    def stamp(self, download_url=None):
+    def stamp(self, download_url=None, pacer_id=None):
         ''' Download stamp that can be added to bottom of documents as a html comment'''
         data = {
             'user': self.user_hash,
             'time': stools.get_time_central(as_string=True),
-            'download_url':download_url
+            'download_url': download_url,
+            'pacer_id': pacer_id
         }
         data_str = ";".join(f"{k}:{v}" for k,v in data.items())
         return f"\n<!-- SCALESDOWNLOAD;{data_str} -->"
+
+    # Misc
+    def get_caseno_info(self, case_no):
+        '''
+        Get the info from the possible case no request_type
+        Inputs:
+            - browser (Selenium browser instance)
+            - court (str): court abbreviation
+            - case_no (str): pacer case no (e.g. "1:16-cv-12345")
+        Output:
+            - response ('missing', 'success')
+            - data (list) of dicts with request_case_no and all other returned fields
+            Note: raises ValueError for unexplained api error
+        '''
+        data = []
+
+        url = stools.get_pacer_url(self.court, 'possible_case') +'?' + case_no
+        response, content = get_xml_response(self.browser, url)
+
+        # If login error, log in and try again
+        if response=='not_logged_in':
+            self.login()
+            response, content = get_xml_response(self.browser, url)
+
+        # Handle error
+        if response in ('error', 'not_logged_in'):
+            raise ValueError(f'Error with case {case_no}')
+
+        elif response=='missing':
+            data = []
+
+        elif response=='success' and type(content)==dict:
+            # Deal with singleton
+            cases = content['request']['case']
+            if type(cases)!= list:
+                cases = [cases]
+
+            data = [{'ucid': dtools.ucid(self.court, case_no),  **line} for line in cases]
+
+        return response, data
+
+    def get_caseno_info_id(self, case_no, def_no=None):
+        '''
+        Get the info from possible case no request_type but just return the id
+
+        Inputs:
+            - case_no (str): a case no of the form 1:16-cv-12345
+            - def_no (str or int): the defendant no. of interest, if None assumes main case
+        Output:
+            - pacer_id (int)
+        '''
+
+        pacer_id = None
+        try:
+            response, data = self.get_caseno_info(case_no)
+        except:
+            return
+
+        if response=='success':
+
+            if len(data) == 1:
+                pacer_id = data[0].get('id', None)
+
+            else:
+                query_def_no = str(def_no) if def_no else '0'
+                candidates = list(filter(lambda x: x.get('defendant',None) == query_def_no, data))
+                if len(candidates):
+                    pacer_id = candidates[0]['id']
+
+        return int(pacer_id) if pacer_id else None
 
 ##########################################################
 ###  QUERY SCRAPER
@@ -181,6 +284,12 @@ class QueryScraper(CoreScraper):
             return False
 
     def pull_queries(self):
+        '''
+        Pull all relevant search queries.
+
+        Output:
+            - results (list): list of paths to htmls of query results
+        '''
         results = []
         if not self.browser:
             login_success = self.launch_browser()
@@ -242,12 +351,13 @@ class DocketScraper(CoreScraper):
 
     re_mem = re.compile('''<a href=[\\\]{0,1}["']/cgi-bin/DktRpt.pl\?[0-9]{1,10}[\\\]{0,1}['"]>[0-9]\:[0-9][0-9]\-c[vr]-[0-9]{3,10}</a>''')
 
-    def __init__(self, core_args, show_member_list='avoid', docket_update=False):
+    def __init__(self, core_args, show_member_list='avoid', docket_update=False, exclude_parties=False):
 
         super().__init__(**core_args)
         self.files = None
         self.show_member_list = show_member_list
         self.docket_update = docket_update
+        self.exclude_parties = exclude_parties
 
         # Retrieve the list of previously seen members only if show_member_list is 'avoid'
         self.member_list_seen = get_member_cases(core_args['court_dir']) if show_member_list=='avoid' else []
@@ -282,12 +392,17 @@ class DocketScraper(CoreScraper):
         ''' Check if no docket lines (message: "...none satisfy the selection criteria")'''
         return bool(re.search(stools.re_no_docket, self.browser.find_element_by_css_selector('#cmecfMainContent').text))
 
+    def at_longtime(self):
+        ''' Check if at the "The report may take a long time..." page '''
+        longtime_str = "report may take a long time to run because this case has many docket entries"
+        return longtime_str in self.browser.find_element_by_css_selector('#cmecfMainContent').text[:200]
+
     @run_in_executor
     def pull_case(self, case, new_member_list_seen):
         '''
         Pull the docket from a single case
         Inputs
-            - case (dict): dictionary with case details (case_no, latest_date, previously_downloaded)
+            - case (dict): dictionary with case details (case_no, latest_date, previously_downloaded, def_no)
             - new_member_list_seen (list): list of new member cases being updated during session
         '''
         # Navigate to docket report page
@@ -300,11 +415,15 @@ class DocketScraper(CoreScraper):
         docket_url = ftools.get_pacer_url(self.court, 'docket')
         self.browser.get(docket_url)
 
+        # Build the input case no to allow for defendant no to be included
+        case_no_input = case['case_no'] + f"-{case['def_no']}" if 'def_no' in case.keys() else case['case_no']
         fill_values = {
-            'case_no': case['case_no'],
+            'case_no': case_no_input
         }
 
-        if case.get('previously_downloaded',False):
+        latest_date = case.get('latest_date', False)
+        # Previously downloaded implies date_from supplied
+        if latest_date:
             # Calculate next day and add to fill_values
             next_day = (pd.to_datetime(case['latest_date']) + pd.Timedelta(days=1))
             fill_values['date_from'] = next_day.strftime(ftools.FMT_PACERDATE)
@@ -318,17 +437,34 @@ class DocketScraper(CoreScraper):
         elif self.show_member_list == 'always':
             fill_values['include_list_member_cases'] = True
 
+        if self.exclude_parties:
+            fill_values['include_parties'] = False
+            fill_values['include_terminated'] = False
+
         time.sleep(PAUSE['mini'])
         docket_report_form = forms.FormFiller(self.browser, 'docket', fill_values)
         docket_report_form.fill()
-        docket_report_form.submit()
 
+        # Call the possible case no api again to get caseno data
+        pacer_id = self.get_caseno_info_id(case['case_no'], case.get('def_no'))
+
+        # Submit the form
+        docket_report_form.submit()
         time.sleep(PAUSE['mini'])
 
+        # Checks before form submission stage complete
         if not self.at_docket_report():
-            self.browser.execute_script('ProcessForm()')
-            time.sleep(PAUSE['moment'])
+            #Check if at "may take a longtime page"
+            if self.at_longtime():
+                initially_requested = self.browser.find_elements_by_css_selector('input[name="date_from"]')[-1]
+                initially_requested.click()
+                time.sleep(PAUSE['micro'])
+                self.browser.execute_script('ProcessForm()')
+            else:
+                self.browser.execute_script('ProcessForm()')
+                time.sleep(PAUSE['moment'])
 
+        # Now assume form submitted correctly, check various scenarious
         if self.at_invalid_case():
             print(f'Invalid case: {case["case_no"]}')
 
@@ -339,7 +475,7 @@ class DocketScraper(CoreScraper):
 
         elif self.at_docket_report():
             # Save the output by case name
-            outpath = self.dir.html / ftools.generate_docket_filename(case['case_no'])
+            outpath = self.dir.html / ftools.generate_docket_filename(case['case_no'], case.get('def_no'))
 
             if case.get('previously_downloaded',False):
                 if self.no_new_docketlines():
@@ -350,14 +486,14 @@ class DocketScraper(CoreScraper):
                 ind = 0
                 while outpath.exists():
                     ind += 1
-                    outpath = self.dir.html / ftools.generate_docket_filename(case['case_no'], ind)
+                    outpath = self.dir.html / ftools.generate_docket_filename(case['case_no'], case.get('def_no'), ind=ind)
 
             time.sleep(PAUSE['micro'])
             download_url = self.browser.current_url
 
             with open(outpath, "w+") as wfile:
                 # Add the stamp to the bottom of the url as it is written
-                wfile.write(self.browser.page_source + self.stamp(download_url))
+                wfile.write(self.browser.page_source + self.stamp(download_url, pacer_id=pacer_id))
             #Write the log
             logging.info(f'Downloaded case: {case["case_no"]}')
 
@@ -411,8 +547,11 @@ def parse_docket_input(query_results, docket_input, case_type, court):
     '''
     Figure out the input for the docket module
     Inputs:
-        - query_results (list): List of query results from query module, will be [] if query scraper didn't run
+        - query_results (list): List of query results (paths to htmls) from query module, will be [] if query scraper didn't run
         - docket_input (Path): the docket input argument
+        - case_type (str)
+        - court (str): court abbreviation
+        - allow_def_stub
      Outputs:
         - input_data (list of dicts): data to be fed into docket scraper
             [{'case_no': 'caseA' 'latest_date': '...'},...] ('latest_date' may or may not be present)
@@ -447,7 +586,7 @@ def parse_docket_input(query_results, docket_input, case_type, court):
     else:
         if docket_input.suffix !='.csv':
             raise ValueError('Cannot interpret docket_input')
-        df = pd.read_csv(docket_input)
+        df = pd.read_csv(docket_input, dtype={'def_no':str})
 
         # Parse ucid and create court and case_no columns
         df = df.assign(**dtools.parse_ucid(df.ucid))
@@ -455,10 +594,13 @@ def parse_docket_input(query_results, docket_input, case_type, court):
         df.query("court==@court", inplace=True)
         df.drop_duplicates('case_no', inplace=True)
 
+        # Fill na for def_no before to_dict
+        if 'def_no' in df.columns:
+            df['def_no'].fillna('', inplace=True)
+
         # Keep just case_no and get lastest_date if it's there
-        keepcols = ['case_no']
-        if 'latest_date' in df.columns:
-            keepcols.append('latest_date')
+        keepcols = [col for col in ('case_no', 'latest_date', 'def_no') if col in df.columns]
+
 
         input_data = df[keepcols].to_dict('records')
 
@@ -473,10 +615,10 @@ def build_case_list_from_queries(query_htmls, case_type, court):
         gdf = parse_query_report(html_path, full_dfs, court, case_type)
         result_set.append(gdf)
 
-    # Compile cases to a single series
-    cases = pd.concat([df['case_id'] for df in full_dfs]).drop_duplicates()
-    # Clean case ids and filter out None values (defendant cases)
-    cases = [x for x in map(ftools.clean_case_id, list(cases)) if x]
+    # Compile cases to a single series, clean case ids and remove duplicates (defendant cases)
+    cases = pd.concat([df['case_id'] for df in full_dfs]).map(ftools.clean_case_id).drop_duplicates()
+    #
+    # cases = [x for x in map(ftools.clean_case_id, list(cases)) if x]
     return cases
 
 def get_downloaded_cases(court_dir):
@@ -536,8 +678,6 @@ class DocumentScraper(CoreScraper):
         Inputs:
             - docket (dict): a dict with a fpath to a single .html file (and potentially a 'doc_no' key)
         '''
-        import pdb
-        pdb.set_trace()
         if self.browser is None:
             login_success = self.launch_browser()
             if not login_success:
@@ -638,24 +778,24 @@ class DocumentScraper(CoreScraper):
 
         return "".join(c for c in att_index if c.isdigit() or c.isalpha())[:10]
 
-    def pull_doc(self, doc, ucid, att=None, retry_count=0):
+    def pull_doc(self, doc, ucid, att=None, retry_count=0, from_doc_selection=False):
         '''
         Download a single document
         Inputs:
             - doc (dict): the doc metadata
             - ucid (str): the ucid for the case
             - fpath (str or Path): new file path
+
         Outputs:
             success (bool): whether download succeeded
         '''
-        import pdb
-        pdb.set_trace()
         att_index = self.clean_att_index(att['ind']) if att else None
         doc_id = ftools.generate_document_id(ucid, doc['ind'], att_index)
         fname =  ftools.generate_document_fname(doc_id, self.user_hash)
         fpath = self.dir.docs/fname
 
-        logging.info(f"{self} downloading document: {doc_id}")
+        if not from_doc_selection:
+            logging.info(f"{self} downloading document: {doc_id}")
 
         # Check if previously downloaded
         if doc_id in self.previously_downloaded_doc_ids:
@@ -678,7 +818,7 @@ class DocumentScraper(CoreScraper):
                     atag = first_row.find_element_by_css_selector('a')
                     doc = stools.get_single_link(atag, mode='selenium')
                     # Re run pull_doc on new doc gathered from selection screen
-                    return self.pull_doc(doc, ucid, att)
+                    return self.pull_doc(doc, ucid, att, from_doc_selection=True)
             except:
                 logging.info(f"{self} ERROR (pull_doc): Could not select from document selection screen ({doc_id})")
                 return False
@@ -711,7 +851,7 @@ class DocumentScraper(CoreScraper):
 
             logging.info(f"File downloaded as {fpath.name}")
             return True
-        # else:
+        else:
         #     # Retry the download
         #     if retry_count < self.RETRY_LIMIT:
         #         rc = retry_count + 1
@@ -768,7 +908,7 @@ def get_latest_docket_date(fpath, court_dir):
         - fpath (str or Path): filepath of html for case
         - court_dir (PacerCourtDir)
     Output:
-        latest_date (str)
+        latest_date (str) - returns None if no dates found in docket
     '''
     fname = Path(fpath).name
     jdir = court_dir.json.relative_to(settings.PROJECT_ROOT)
@@ -780,10 +920,12 @@ def get_latest_docket_date(fpath, court_dir):
 
     # Load case data and get all dates
     jdata = dtools.load_case(jpath)
-    docket_dates = [x['filing_date'] for x in jdata.get('docket', [])]
-    latest_date = pd.to_datetime(docket_dates).max().strftime(ftools.FMT_PACERDATE)
-
-    return latest_date
+    docket_dates = [x['date_filed'] for x in jdata.get('docket', [])]
+    if not len(docket_dates):
+        return None
+    else:
+        latest_date = pd.to_datetime(docket_dates).max().strftime(ftools.FMT_PACERDATE)
+        return latest_date
 
 ##########################################################
 ###  Sequences
@@ -799,7 +941,7 @@ def seq_query(core_args, config):
     QS.close_browser()
     return results
 
-async def seq_docket(core_args, query_results, docket_input, docket_update, show_member_list):
+async def seq_docket(core_args, query_results, docket_input, docket_update, show_member_list, exclude_parties):
     ''' Scraper sequence that handles multiple workers for the Docket module '''
 
     async def _scraper_(ind):
@@ -807,7 +949,8 @@ async def seq_docket(core_args, query_results, docket_input, docket_update, show
         DktS = DocketScraper(
             core_args = {**core_args, 'ind':ind },
             show_member_list = show_member_list,
-            docket_update = docket_update
+            docket_update = docket_update,
+            exclude_parties = exclude_parties
         )
         while len(cases):
             # Check time restriction
@@ -815,7 +958,6 @@ async def seq_docket(core_args, query_results, docket_input, docket_update, show
                 if not check_time_continue(core_args['rts'], core_args['rte']):
                     DktS.close_browser()
                     break
-
             case = cases.pop(0)
             logging.info(f"{DktS} taking {case['case_no']}")
             docket_path = await DktS.pull_case(case, new_member_list_seen)
@@ -854,17 +996,19 @@ async def seq_docket(core_args, query_results, docket_input, docket_update, show
             df_cases['latest_date'] = ''
         df_cases.latest_date.fillna('', inplace=True)
 
-        # Mask for rows that need a latest_date
+        # Mask for rows that need a latest_date, force fill a latest date if previously downloaded
         needs_date = df_cases.previously_downloaded & df_cases.latest_date.eq('')
         dates_needed = df_cases[needs_date]['fpath'].apply(lambda x: get_latest_docket_date(x, core_args['court_dir'] ))
 
         # Update dates for those needed
         df_cases.loc[needs_date, 'latest_date'] = dates_needed
         # Form the cases list
-        cases = df_cases[['case_no', 'ucid', 'latest_date', 'previously_downloaded']].to_dict('records')
+        keepcols = [col for col in ('case_no', 'ucid', 'latest_date', 'previously_downloaded','def_no') if col in df_cases.columns ]
+        cases = df_cases[keepcols].to_dict('records')
     else:
         logging.info(f"Removing previously downloaded cases...")
-        cases = df_cases[~df_cases.previously_downloaded][['case_no', 'ucid']].to_dict('records')
+        keepcols = [col for col in ('case_no', 'ucid', 'def_no') if col in df_cases.columns ]
+        cases = df_cases[~df_cases.previously_downloaded][keepcols].to_dict('records')
 
     del df_cases, df_down, input_data
 
@@ -980,6 +1124,8 @@ async def seq_document(core_args, new_dockets, document_input, document_att, ski
 @click.option('--docket-mem-list', '-mem',type=click.Choice(MEM_LIST_OPTS), default='never', show_default=True,
                help="Docket Scraper: Whether to include the member list in reports: never, always or avoid "+
                      "(avoid: do not include member list in report if current case id was previously seen as a member case)")
+@click.option('--docket-exclude-parties', default=False, is_flag=True, show_default=True,
+               help="Docket Scraper: If True, 'Parties and counsel' and 'Terminated parties' will be excluded from docket report")
 @click.option('--docket-exclusions','-ex', default=settings.EXCLUDE_CASES, show_default=True,
               help="Path to files to exclude (csv with a ucid column)")
 @click.option('--docket-update', '-ex', default=False, show_default=True, is_flag=True,
@@ -995,7 +1141,7 @@ async def seq_document(core_args, new_dockets, document_input, document_att, ski
                help="Document Scraper: skip cases that have more documents than document_limit")
 def main(inpath, mode, n_workers, court, case_type, auth_path, override_time, runtime_start, runtime_end, case_limit,
          query_conf,
-         docket_input, docket_mem_list, docket_exclusions, docket_update,
+         docket_input, docket_mem_list, docket_exclusions, docket_update, docket_exclude_parties,
          document_input, document_att, document_skip_seen, document_limit):
     ''' Handles arguments/options, the run sequence of the 3 modules'''
 
@@ -1062,7 +1208,8 @@ def main(inpath, mode, n_workers, court, case_type, auth_path, override_time, ru
                                                 query_results = query_results,
                                                 docket_input = docket_input,
                                                 docket_update = docket_update,
-                                                show_member_list=docket_mem_list)
+                                                show_member_list = docket_mem_list,
+                                                exclude_parties = docket_exclude_parties)
                         )
 
     # Document Scraper run sequence

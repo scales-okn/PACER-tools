@@ -41,10 +41,10 @@ re_jurisdiction = re.compile('Jurisdiction: [A-Za-z0-9 :(\.)]{1,100}')
 re_lead_case_id = re.compile('Lead case: <a href=[^>]*>[A-Za-z0-9:-]{1,100}')
 re_demand = re.compile('Demand: [0-9\,\$]{1,100}')
 re_other_court = re.compile('Case&nbsp;in&nbsp;other&nbsp;court:</td><td>&nbsp;[A-Za-z0-9 :;()\.\,\-]{1,100}') # brittle but functional
-re_party = re.compile('<b><u>([A-Za-z ]{1,100})(?:</u|\()')
-re_pacer_case_id = re.compile('DOCKET FOR CASE #: [A-Za-z0-9 :\-]{1,100}')
+re_party = re.compile('<b><u>([A-Za-z\- ]{1,100})(?:</u|\()')
+re_header_case_id = re.compile('DOCKET FOR CASE #: [A-Za-z0-9 :\-]{1,100}')
 
-WSPACE = string.whitespace+r'\xc2\xa0'
+NBSP = r'\xc2\xa0'
 
 
 ########################
@@ -65,8 +65,8 @@ def re_existence_helper(obj):
 
 def line_detagger(obj):
     if obj != None:
-        while '***' in obj: # sometimes Pacer does, e.g., "***DO NOT FILE IN THIS CASE***"
-            obj = obj.split('***')[0]+obj.split('***')[2]
+        while obj.count('***') > 1: # sometimes Pacer does, e.g., "***DO NOT FILE IN THIS CASE***"
+            obj = obj.split('***')[0] + '***'.join(obj.split('***')[2:])
         return re.sub('\<[^<]+?>', '', obj).strip('<>?! ')
     else:
         return None
@@ -276,6 +276,7 @@ def process_parties_and_counts(text, is_cr):
     for role in roles:
         if role not in mappings.keys():
             mappings[role] = {'title':role, 'type':'misc'} # this role isn't in the dict, so spoof an entry for it
+            print(f'Role title not found: {role}')
 
     # process parties
     split = split_on_multiple_separators(text, ['<u>'+x for x in roles]) # add HTML '<u>' to weed out, e.g., 'Defendant' in disposition text
@@ -284,21 +285,23 @@ def process_parties_and_counts(text, is_cr):
         party_type = mappings[role]['type']
         if 'represented' in chunk:
             name, chunk_answer = process_entity_and_lawyers(chunk, party_title)
-            while len(chunk.split('represented'))>2: # edge case: no "defendant" heading (should only happen in civil cases)
-                chunk = chunk.split('represented',1)[1]
-                new_name, new_answer = process_entity_and_lawyers(chunk, party_title)
-                parties[party_type] = update_party(parties[party_type], new_name, new_answer)
+            if len(chunk.split('represented'))>2: # edge case: no "defendant" heading (should only happen in civil cases)
+                subchunk = chunk
+                while len(subchunk.split('represented'))>2:
+                    subchunk = subchunk.split('represented',1)[1]
+                    new_name, new_answer = process_entity_and_lawyers(subchunk, party_title)
+                    parties[party_type] = update_party(parties[party_type], new_name, new_answer)
         elif '<b>' in chunk: # edge case: defendant didn't have representation
             name, chunk_answer = process_entity_without_lawyers(chunk, party_title)
+        parties[party_type] = update_party(parties[party_type], name, chunk_answer)
 
         # process counts
-        parties[party_type] = update_party(parties[party_type], name, chunk_answer)
         if party_type == 'defendant' and is_cr:
             ipc = process_criminal_counts(chunk, 'Pending Counts')
             pending_counts[name] = ipc
             itc = process_criminal_counts(chunk, 'Terminated Counts')
             terminated_counts[name] = itc
-            ic = line_cleaner(chunk.split('<u>Complaints')[1].split('width="40%">')[2].split('</td>')[0])
+            ic = line_cleaner(chunk.split('<u>Complaints')[1].split('width="40%">')[2].split('</td>')[0]) if '<u>Complaints' in chunk else 'None'
             complaints[name] = None if ic == 'None' else ic
 
     return tuple(v for k,v in parties.items()) + (pending_counts, terminated_counts, complaints)
@@ -387,41 +390,113 @@ def parse_docket(docket_table):
     Inputs:
         - docket_table (WebElement): the docket report main table
     Output:
-        data_rows (list): list of tuples with 4 entries (date(str), ind(str), entry_text(str), links(dict))
+        data_rows (list): list of dicts with 5 entries (date_filed(str), ind(str), docket_text(str), documents(dict), edges(list of tuples))
     '''
-    # Get all doc ids from line doc links (second column)
-    line_doc_ids = [ x.attrs.get('href').split('/')[-1]
-                     for x in docket_table.select('tr td:nth-of-type(2) a') ]
-    data_rows = []
-    for row in docket_table.select('tr')[1:]:
-        links = {}
+
+    def _get_doc_id_(td):
+        ''' Gets the id from an atag within a 2nd column td, returns None if td is empty'''
+        atag = td.select_one('a')
+        return atag.attrs.get('href').split('/')[-1] if atag else None
+
+    def _encode_tags_(atag):
+        '''
+        Encode tag info into the string of a tag so it can pass through bs4 .text method
+        Input:
+            - atag (bs4 tag): a bs4 <a> tag
+        Output:
+            No output, this alters the atag.string property in place
+        '''
+        url = atag.attrs.get('href')
+        doc_id = url.split('/')[-1]
+
+        # Reference/Edge, encode the scales index
+        if doc_id in line_doc_map.keys():
+            scales_ind = line_doc_map[doc_id]
+            encoded_info = scales_ind
+            link_type = 'ref'
+
+        # For attachment atags, encode the url
+        else:
+            encoded_info = url
+            link_type = 'att'
+
+        label = atag.string
+        atag.string = f"###{link_type}_{encoded_info}_{label}###"
+
+    # Get td tags from second column and map them to ids
+    col2 =  docket_table.select('tr td:nth-of-type(2)')[1:]
+    col2_ids = map(_get_doc_id_, col2)
+
+    # Map document id to locational index
+    line_doc_map = {doc_id:scales_ind for scales_ind,doc_id in enumerate(col2_ids) if doc_id }
+
+    out_rows = []
+    for scales_ind, row in enumerate(docket_table.select('tr')[1:]):
+        documents, edges = {}, []
+
         cells = row.select('td')
         td_date, td_ind, td_entry = cells
 
         # Get line doc link
         if td_ind.select('a'):
-            links['0'] = td_ind.select_one('a').attrs.get('href')
+            documents['0'] = {'url': td_ind.select_one('a').attrs.get('href'),'span': {} }
 
-        # Get attachment links
+        # Get all atags
         atags = td_entry.select('a')
         # Filter out external links (by only using digit links)
         atags = [a for a in atags if a.text.strip().isdigit()]
-        # Filter out references to previous lines
-        atags = [a for a in atags if a.attrs.get('href').split('/')[-1] not in line_doc_ids]
 
-        for a in atags:
-            links[a.text] = {'url':a.attrs.get('href')}
+        # Encode the tags
+        list(map(_encode_tags_, atags))
 
-        date_filed, ind, docket_text = tuple(x.text.strip(WSPACE) for x in cells)
-        data_row = {
+        # Convert html to clean text, docket_text_pre is pre the decoding process (includes the ###..###)
+        date_filed, ind, docket_text_pre = tuple(line_cleaner(x.text.replace(NBSP,'').strip()) for x in cells)
+
+        # Buld docket_text iteratively through string addition, parse edges and documents on-the-fly
+        # This will be the output clean json text
+        docket_text_post = ''
+        # Pointer to keep track of place within docket_text_pre
+        pointer = 0
+
+        # Pattern for regex to decode what was encoded in _encode_tags_
+        re_encoded_tag = r"###(?P<link_type>ref|att)_(?P<encoded_info>[\s\S]+?)_(?P<label>\d+)###"
+
+        # Iterate through all tags that have been encoded as ###...###
+        for match in re.finditer(re_encoded_tag, docket_text_pre):
+            # Get the start and end index of the match relative to docket_text_pre
+            start, end = match.span()
+
+            # Add text up until this match
+            docket_text_post += docket_text_pre[pointer : start]
+
+            # Decode info
+            link_type, encoded_info, label = match.groups()
+            # Build the span
+            span = {'start':len(docket_text_post), 'end': len(docket_text_post) + len(label)}
+            # Add the label to the text (what was previously inside the a tag)
+            docket_text_post += label
+
+            # Add to documents or edges
+            if link_type=='ref':
+                edges.append( [scales_ind, int(encoded_info), span] )
+            elif link_type=='att':
+                documents[label] = {'url':encoded_info, 'span': span}
+
+            pointer = end
+
+        # Make sure to get the last bit of text
+        docket_text_post += docket_text_pre[pointer: ]
+
+        out_row = {
             'date_filed': date_filed,
             'ind': ind,
-            'docket_text': docket_text,
-            'links': links
+            'docket_text': docket_text_post,
+            'documents': documents,
+            'edges': edges
         }
-        data_rows.append(data_row)
+        out_rows.append(out_row)
 
-    return data_rows
+    return out_rows
 
 def parse_stamp(html_text, llim=-400):
     '''
@@ -500,7 +575,7 @@ def process_html_file(case_dockets, member_cases, court=None):
             member_cases_found = False
 
     # Some fields are universal (judge, filing date, terminating date...)
-    case_data['pacer_case_id'] = re_existence_helper( re_pacer_case_id.search(html_text) )
+    case_data['header_case_id'] = re_existence_helper( re_header_case_id.search(html_text) )
     case_data['filing_date'] = re_existence_helper( re_fdate.search(html_text) )
     case_data['terminating_date'] = re_existence_helper( re_tdate.search(html_text) )
     if case_data['terminating_date'] == None:
@@ -588,6 +663,7 @@ def process_html_file(case_dockets, member_cases, court=None):
     # Scraper stamp data
     stamp_data = parse_stamp(html_text)
     case_data['download_url'] = stamp_data.get('download_url')
+    case_data['pacer_case_id'] = stamp_data.get('pacer_id')
 
     return case_data
 
