@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "http://github.com/scales-okn/PACER-tools/schemas/docket_entry_v1.schema.json",
+  "title": "An entry in a case docket",
+  "description": "A schema for a docket entry in a PACER docket report" ,
+  "properties": {
+    "date_filed": {
+      "type": "string",
+      "description": "The date the docket entry was filed"
+    },
+    "ind": {
+      "type": "string",
+      "description": "The PACER index, printed in the '#' column of the docket entry"
+    },
+    "docket_text": {
+      "type": "string",
+      "description": "The raw text of the docket entry"
+    },
+    "documents": {
+      "type": "object",
+      "description": "The documents associated with a docket line",
+      "items": {
+        "$ref": "#/$defs/document"
+        }
+    },
+    "edges": {
+      "type": "array",
+      "description": "In-line references to other docket lines, captured as edge triples",
+      "items": [
+        {
+          "type": "number",
+          "description": "The source node (always the row itself)"
+        },
+        {
+          "type": "number",
+          "description": "The target node (the preceeding row/document its pointing to)"
+        },
+        {
+          "type": "object",
+          "description": "The span, relative to docket_text, where the reference appears",
+          "properties":{
+            "start": {
+              "type": "number",
+              "description": "The character index, relative to docket_text, of the start of the reference"
+            },
+            "end": {
+              "type": "number",
+              "description": "The character index, relative to docket_text, of the end of the reference"
+            }
+          }
+        }
+
+      ]
+    }
+  },
+  "$defs": {
+    "document": {
+      "type": "object",
+      "description": "A document associated with a case. Keys in this object are ..",
+      "propertyNames": "^\\d+$",
+      "additionalProperties": {
+        "type": "object",
+        "description":"",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The url of the document"
+          },
+          "span": {
+            "type": "object",
+            "description": "The span, relative to docket_text, where the reference to the document appears (always null for the 0th document, which is linked from the '#' column",
+            "properties":{
+              "start": {
+                "type": "number",
+                "description": "The character index, relative to docket_text, of the start of the reference"
+              },
+              "end": {
+                "type": "number",
+                "description": "The character index, relative to docket_text, of the end of the reference"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

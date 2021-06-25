@@ -1,0 +1,191 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "$id": "http://github.com/scales-okn/PACER-tools/schemas/party_cr_v1.schema.json",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the party in the case"
+    },
+    "counsel": {
+      "type": "array",
+      "description": "An array of the party's lawyers in the case",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Counsel name"
+          },
+          "office_name": {
+            "type": "string",
+            "description": "Name of the counsel's firm or legal office"
+          },
+          "address": {
+            "type": "string",
+            "description": "Counsel address, string delimited by '\\n' newline character"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Counsel phone number, e.g. (123) 456-7890"
+          },
+          "fax": {
+            "type": "null",
+            "description": "Counsel fax number"
+          },
+          "email": {
+            "type": "string",
+            "description": "Counsel email address"
+          },
+          "is_lead_attorney": {
+            "type": "boolean",
+            "description": "Whether or not counsel is listed as lead attorney"
+          },
+          "is_pro_hac_vice": {
+            "type": "boolean",
+            "description": "Whether or not counsel is listed as pro hac vice"
+          },
+          "is_notice_attorney": {
+            "type": "boolean",
+            "description": "Whether or not counsel is listed as attorney to be noticed"
+          },
+          "see_above_for_address": {
+            "type": "boolean",
+            "description": "Whether or not address is listed as 'see above for address', meaning address info should be obtained from preceding counsel entries"
+          },
+          "designation": {
+            "type": "string",
+            "description": "This counsel's designation within the case (Retained, Government Attorney, Public Defender, etc)"
+          },
+          "bar_status": {
+            "type": "string",
+            "description": "This counsel's standing with respect to the general bar (Admitted, Not Admitted, etc)"
+          },
+          "trial_bar_status": {
+            "type": "string",
+            "description": "This counsel's standing with respect to the ILND trial bar, when applicable"
+          },
+          "counsel_terminating_date": {
+            "type": "string",
+            "description": "The date (if any) that this counsel was terminated from the case"
+          },
+          "raw_info": {
+            "type": "string",
+            "description": "The original value of the Pacer counsel field before being parsed out into the above SCALES fields"
+          },
+          "recap_counsel_error": {
+            "type": "boolean",
+            "description": "A flag indicating that counsel information is missing due to a Recap error in which lawyers with identical names are merged incorrectly"
+          }
+        }
+      }
+    },
+    "is_pro_se": {
+      "type": "boolean",
+      "description": "Whether or not the party is appearing pro se, i.e. representing themselves"
+    },
+    "pro_se_source": {
+      "type": "string",
+      "description": "The source that led us to believe this party is pro se ('explicit'=written out in the docket, 'implicit'=address-like info found for a lawyerless party)",
+      "enum": ["explicit", "implicit"]
+    },
+    "extra_pro_se_info": {
+      "type": "string",
+      "description":"For pro se parties, non-subheading party-related text that doesn't fit into counsel buckets (prisoner number, prison name, etc) - newline-delimited"
+    },
+    "terminating_date": {
+      "type": "string",
+      "description":"The date (if any) that this party was terminated from the case"
+    },
+    "extra_info": {
+      "type": "string",
+      "description":"Any Pacer subheadings for this party (alt names, corporation types, the capacity in which they're appearing, etc) - newline-delimited"
+    },
+    "judge": {
+      "type": "string",
+      "description": "The defendant-specific assigned judge"
+    },
+    "appeals_case_ids": {
+      "type": "array",
+      "description": "The case ids of any defendant-specific appeals issuing from this case",
+      "items": {
+        "type": "string"
+      }
+    },
+    "role": {
+      "type": "string",
+      "description": "This party's role in the case, as listed in their Pacer heading (e.g. 'Defendant', 'Plaintiff', 'Petitioner', 'Appellant'...)"
+    },
+    "party_type": {
+      "type": "string",
+      "description": "The broad bucket in which this party's role belongs, ascertained via a hand-coded mapping of the role",
+      "enum": ["defendant", "plaintiff", "misc", "other_party", "bk_party"]
+    },
+    "pacer_id": {
+      "type": "number",
+      "description": "The intra-case defendant id - e.g. for a defendant listed as 'Jane Doe (2),' the Pacer id is 2"
+    },
+    "referred_judges": {
+      "type": "array",
+      "description": "The defendant-specific referred judges listed after 'Referred to:'; only present when the case was referred to a second judge",
+      "items": {
+        "type": "string"
+      }
+    },
+    "pending_counts": {
+      "type": "array",
+      "description": "",
+      "items": {
+        "$ref": "#/$defs/count"
+      }
+    },
+    "terminated_counts": {
+      "type": "array",
+      "description": "",
+      "items": {
+        "$ref": "#/$defs/count"
+      }
+    },
+    "highest_offense_level_opening": {
+      "type": "string",
+      "description": "The degree of the most serious charges against this defendant at the start of the case (felony, misdemeanor, etc)"
+    },
+    "highest_offense_level_terminated": {
+      "type": "string",
+      "description": "The degree of the most serious charges against this defendant at the end of the case (felony, misdemeanor, etc)"
+    },
+    "complaints_text": {
+      "type": "string",
+      "description": "The primary criminal complaints against this defendant (sometimes supplements the count fields, sometimes duplicates them, and sometimes stands in for them)"
+    },
+    "complaints_disposition": {
+      "type": "string",
+      "description": "The disposition of the complaints (prison time, dismissal, etc)"
+    },
+    "recap_party_error": {
+      "type": "boolean",
+      "description": "A flag indicating that party information is missing due to a Recap error in which parties with identical names are merged incorrectly"
+    }
+  },
+  "$defs": {
+    "count": {
+      "type": "object",
+      "description": "A count against a defendant",
+      "properties": {
+        "pacer_id": {
+          "type": "string",
+          "description": "The intra-defendant count id - e.g. for a count listed as 'FRAUD AND FALSE STATEMENTS(1s-2s),' the Pacer id is 1s-2s"
+        },
+        "text": {
+          "type": "string",
+          "description": "The text of the count (e.g. 'FRAUD AND FALSE STATEMENTS')"
+        },
+        "disposition": {
+          "type": "string",
+          "description": "The disposition of the count (prison time, dismissal, etc)"
+        }
+      }
+    }
+  }
+
+}
