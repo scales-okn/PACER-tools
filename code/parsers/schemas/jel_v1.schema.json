@@ -1,0 +1,41 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "$id": "http://github.com/scales-okn/PACER-tools/schemas/JEL_v1.json",
+    "title": "JEL Schema",
+    "description": "The JEL is the Judge Entity Lookup for all unique judge entities" ,
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "The name of the unique judge entity"
+      },
+      "Presentable_Name": {
+        "type": "string",
+        "description": "A human readable entity name with first letters capitalized in each token"
+      },
+      "SJID": {
+        "type": "string",
+        "description": "Unique SCALES Judge Identifier for the Paren Entity associated with this location"
+      },
+      "SCALES_Judge_Label": {
+        "type": "number",
+        "enum": ["FJC Judge","Magistrate_Judge","Nondescript_Judge","Judicial_Actor","Bankruptcy_Judge","District_Judge"],
+        "description": "The predicted judge type based on the SCALES disambiguation routine and algorithmic labelling"
+      },
+      "Head_UCIDs": {
+        "type": "number",
+        "description": "The total number of unique docket headers this entity existed on from our disambiguation sample"
+      },
+      "Tot_UCIDs": {
+        "type": "number",
+        "description": "The total number of unique dockets this entity existed on from our disambiguation sample"
+      },
+      "Full_Name": {
+        "type": "number",
+        "description": "If the judge entity is a known Article III judge from the FJC biological dictionary, then this is the concatenation of FJC name fields"
+      },
+      "NID": {
+        "type": "string",
+        "description": "If the judge entity is a known Article III judge from the FJC biological dictionary, then this is the FJC NID field"
+      },
+    }
+  }

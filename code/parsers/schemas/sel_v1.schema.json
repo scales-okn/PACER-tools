@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "$id": "http://github.com/scales-okn/PACER-tools/schemas/SEL_v1.json",
+  "title": "SEL Schema",
+  "description": "SEL files are Spacy Entity Lookup files for a particular docket's judge entities" ,
+  "properties": {
+    "Entity_Extraction_Method": {
+      "type": "string",
+      "enum": ["SPACY JNLP2", "referred_judges", "assigned_judge"],
+      "description": "The method used to extract and identify an entity at this location. A Spacy Judge NLP Model, or docket key values",
+    },
+    "docket_source": {
+      "type": "string",
+      "enum": ["line_entry","case_header", "case_parties"],
+      "description": "Source from the docket that this entity was pulled from."
+    },
+    "judge_enum": {
+      "type": "number",
+      "description": "If there are multiple entities in a lookup source, we enumerate them pythonically in the order they are listed; null for docket entries"
+    },
+    "party_enum": {
+      "type": "number",
+      "description": "The enumerated party number (0-indexed) that the judge entity was tied to on a criminal case; null for civil and docket entries"
+    },
+    "pacer_id": {
+      "type": "number",
+      "description": "If the judge in the header metadata was given an ID on the PACER HTML, we replilcate that here"
+    },
+    "docket_index": {
+      "type": "number",
+      "description": "The docket entry index (0-start) that this entity is located at; null for case_header and case_parties"
+    },
+    "ucid": {
+      "type": "string",
+      "description": "Unique case identifier (SCALES internal)"
+    },
+    "cid": {
+      "type": "string",
+      "description": "Local court case identifier"
+    },
+    "court": {
+      "type": "string",
+      "description": "Abbreviation for the Federal District Court this case is docketed at"
+    },
+    "year": {
+      "type": "number",
+      "description": "Approximation of the filing date year for the overall case"
+    },
+    "original_text": {
+      "type": "string",
+      "description": "Original string of text found on the docket that our entity was extracted from, padded with preceding and trailing tokens"
+    },
+    "Extracted_Entity": {
+      "type": "string",
+      "description": "Specific string of text that represents the entity this row of data references"
+    },
+    "Prefix_Categories": {
+      "type": "string",
+      "enum":["assigned_judge","referred_judges", "Bankruptcy_Judge","Circuit_Appeals","District_Judge","Magistrate_Judge","Nondescript_Judge","Judicial_Actor"],
+      "description": "The categorization of the preceding text before the entity. The label corresponds to types of words appearing before the judge entity"
+    },
+    "Transferred_Flag": {
+      "type": "boolean",
+      "description": "A boolean flag indicating if the judge entity was prefaced immediately prior with terminology related to case transferrals."
+    },
+    "full_span_start": {
+      "type": "number",
+      "description": "Span starting point for the Original Text with respect to the overall text at the particular docket_source-docket_index location"
+    },
+    "full_span_end": {
+      "type": "number",
+      "description": "Span ending point for the Original Text with respect to the overall text at the particular docket_source-docket_index location"
+    },
+    "Entity_Span_Start": {
+      "type": "number",
+      "description": "Span starting point for the Extracted Entity with respect to the overall text at the particular docket_source-docket_index location"
+    },
+    "Entity_Span_End": {
+      "type": "number",
+      "description": "Span ending point for the Extracted Entity with respect to the overall text at the particular docket_source-docket_index location"
+    },
+    "Parent_Entity": {
+      "type": "string",
+      "description": "The identified unique entity the Extracted Entity in the data row is referring to."
+    },
+    "SJID": {
+      "type": "string",
+      "description": "Unique SCALES Judge Identifier for the Paren Entity associated with this location"
+    },
+  }
+}
