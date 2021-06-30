@@ -36,6 +36,6 @@
       "NID": {
         "type": "string",
         "description": "If the judge entity is a known Article III judge from the FJC biological dictionary, then this is the FJC NID field"
-      },
+      }
     }
   }

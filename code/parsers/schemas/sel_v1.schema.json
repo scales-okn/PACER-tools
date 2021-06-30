@@ -7,7 +7,7 @@
     "Entity_Extraction_Method": {
       "type": "string",
       "enum": ["SPACY JNLP2", "referred_judges", "assigned_judge"],
-      "description": "The method used to extract and identify an entity at this location. A Spacy Judge NLP Model, or docket key values",
+      "description": "The method used to extract and identify an entity at this location. A Spacy Judge NLP Model, or docket key values"
     },
     "docket_source": {
       "type": "string",
@@ -86,6 +86,6 @@
     "SJID": {
       "type": "string",
       "description": "Unique SCALES Judge Identifier for the Paren Entity associated with this location"
-    },
+    }
   }
 }
