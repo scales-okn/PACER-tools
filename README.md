@@ -25,11 +25,23 @@ This is a demo version of PACER with demo credentials that can be used for free.
 ## 1. Getting Started
 
  - Clone this PACER-tools repo
- - Install any missing python packages
+ - Install any missing python packages (see below)
  - Make sure you have a recent version of Firefox installed (80.0+) and [GeckoDriver](https://github.com/mozilla/geckodriver) for Firefox
 
-**Download folder**
-For this tutorial we are going to put our data into */data/pacer*. The scraper separates out data by district, so it's best to have a subdirectory for each district, named by court abbreviation (e.g. */data/pacer/ilnd* for Northern District of Illinois). When the scraper runs it will build the necessary structure inside of that subdirectory that it needs to download and house the data from Pacer.
+### Installing packages
+
+This project was originally developed for use with the [Anaconda](https://www.anaconda.com) python distribution. 
+
+Anaconda users can create a new project using `conda install -n PACER-tools requirements.txt`; change *PACER-tools* to any other project name if you prefer.
+
+If you are not an Anaconda user, you can install the python requirements for this project using `pip install -r pip-requirements.txt`; we recommend creating a separate virtual environment for this project.  The reference Python used for development is `3.8.5` but this should work with any `3.8.x` and probably with any version of Python 3.
+
+Anaconda also manages installation of many non-python dependencies. Non-Anaconda users may have to install these themselves, in ways which may vary from platform to platform. A list of the non-python dependencies is included, in a series of commented lines, at the end of `pip-requirements.txt` but they may not all be needed, and installing them will vary. If you use PACER-tools without using Anaconda, we welcome help improving the documentation about what needs to be installed, and, to the extent possible, how it should be installed.
+
+
+
+### Download folder
+For this tutorial we are going to put our data into *data/pacer*. The scraper separates out data by district, so it's best to have a subdirectory for each district, named by court abbreviation (e.g. *data/pacer/ilnd* for Northern District of Illinois). When the scraper runs it will build the necessary structure inside of that subdirectory that it needs to download and house the data from Pacer.
 
 Since we are using the PACER demo, we will use the court abbreviation it uses which is *psc* (for PACER Service Centre). The scraper will take an `inpath` argument, to which we will pass */data/pacer/psc*.
 
@@ -61,7 +73,7 @@ The user will be prompted for the following:
 *Note*:
 *All of these parameters that the user was prompted for can actually be given as arguments to the script. These are all explained in full in the documentation. To avoid the prompting you can instead run:*
 
-    python scrapers.py --override-time --query-conf demo.json -m query -c psc -a login/demo.auth -cl 50 data/pacer/psc
+    python scrapers.py --override-time --query-conf demo.json -m query -c psc -a login/demo.auth -cl 50 ../../data/pacer/psc
 
 
 **Result**
