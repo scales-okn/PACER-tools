@@ -60,7 +60,7 @@ def bundler(indf, name, notes=None, overwrite=False, anno_col=None):
         else:
             raise ValueError(f'The directory {str(bundle_dir)} already exists')
     else:
-        bundle_dir.mkdir()
+        bundle_dir.mkdir(parents=True)
 
     # Start building html index page with strings
     heading = f"<h1 class='heading'>Data Dump: {name}</h1>"
@@ -140,7 +140,7 @@ def build_new_td(json_text, row_annotations, soup=None, inner_html=False):
     og_pointer = 0
 
     # Sort annotation by 'start'
-    sorted(row_annotations, key=lambda x: x['start'])
+    row_annotations.sort(key=lambda x: x['start'])
 
     # Iterate through each annotation and 'swap out' original text for new span
     for annot in row_annotations:
@@ -171,7 +171,7 @@ def make_annotated_docket(html_text, json_data, case_annotations):
     Inputs:
         - html_text (str)
         - json_data (dict)
-        - case_annotations (dict): mapping from row index (within case) -> annotation data dict e.g. {2: [ {span1},...], 5: [ {span2}, ...]}
+        - case_annotations (dict): mapping from row index (int, ordinal index) -> annotation data list of dicts e.g. {2: [ {span1},...], 5: [ {span2}, ...]}
 
     Output:
         (str) html source text for annotated html
@@ -185,18 +185,17 @@ def make_annotated_docket(html_text, json_data, case_annotations):
     for row_index, tr in enumerate(docket_table.select('tr')[1:]):
 
         # Skip row if no annotation
-        if str(row_index) not in case_annotations.keys():
+        if row_index not in case_annotations.keys():
             continue
 
         tr.attrs['class'] = tr.attrs.get('class', '') + ' annotated'
 
         #Isolate the original td
-        #todo:update with new docket structure
         docket_entry_td = tr.select('td')[2]
 
         # Gather info for new td
-        jdata_text = json_data['docket'][row_index][2]
-        row_annotations = case_annotations[str(row_index)]
+        jdata_text = json_data['docket'][row_index]['docket_text']
+        row_annotations = case_annotations[row_index]
 
         # Build and inject new td
         new_cell = build_new_td(jdata_text, row_annotations, soup)
@@ -208,5 +207,50 @@ def make_annotated_docket(html_text, json_data, case_annotations):
     style_tag.string = open(settings.STYLE/'pacer_docket.css').read().replace('\n','')
     soup.head.append(style_tag)
 
-    #TODO better way to handle this encoding issue?
     return re.sub(r"b'|\\n|\\t",'',str(soup))
+
+def make_annotated_docket_for_dash(html_text, json_data, case_annotations, range_to_keep):
+    '''
+    Annotate a Pacer docket and return only a specified range of docket lines in JSON format - for use with make_excerpts()
+
+    Inputs:
+        - html_text (str)
+        - json_data (dict)
+        - case_annotations (dict): mapping from row index (within case) -> annotation data dict e.g. {'2': [ {span1}, ... ], '5': [ {span2}, ... ]}
+        - range_to_keep (range): the range of docket lines (SCALES-indexed) to be returned
+
+    Output:
+        (dict) the docket excerpt as a JSON
+    '''
+
+    # make the preliminary JSON and the soup
+    new_json = {"case_id": json_data['case_id'], "docket": []}
+    soup = BeautifulSoup(html_text, 'html.parser')
+    docket_table = soup.select('table')[-2]
+
+    # check whether each row needs to be inserted into the final JSON
+    for row_index, tr in enumerate(docket_table.select('tr')[1:]):
+        if row_index in range_to_keep:
+
+            # check whether this row needs to be annotated
+            if str(row_index) in case_annotations.keys():
+                row_annotations = case_annotations[str(row_index)]
+                tr.attrs['class'] = tr.attrs.get('class', '') + ' annotated'
+            else:
+                row_annotations = {}
+
+            # gather remaining info needed for build_new_td()
+            old_entry = json_data['docket'][row_index]
+            new_docket_text = old_entry['docket_text']
+
+            # build & insert new docket entry
+            new_docket_html = build_new_td(new_docket_text, row_annotations, inner_html=True)
+            new_entry = {
+                "date_filed": old_entry['date_filed'],
+                "ind": old_entry['ind'],
+                "docket_text": new_docket_text,
+                "docket_html": new_docket_html
+                }
+            new_json['docket'].append(new_entry)
+
+    return new_json

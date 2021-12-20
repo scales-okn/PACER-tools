@@ -16,6 +16,7 @@ import_dict = {
     'support.judge_functions':'jf',
 }
 
+print('')
 for mod, alias in import_dict.items():
     globals().update({alias:importlib.import_module(mod)})
     print(f"Imported {mod} as {alias}")

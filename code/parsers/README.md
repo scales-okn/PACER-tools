@@ -3,19 +3,21 @@ A parser that reads HTMLs downloaded from Pacer.gov and breaks them up into JSON
 
 # Usage
 To run the parser:
-
-    python parse_pacer.py [OPTIONS] INPATH OUTPATH
-    
+```
+python parse_pacer.py [OPTIONS] INPUT_DIR
+```
 ### Arguments
- - `INPATH`: Relative path to the folder where HTMLs will be read, e.g.   `../../data/pacer/ilnd/html`.
- - `OUTPATH`: Relative path to the folder where JSONs will be written, e.g.   `../../data/pacer/ilnd/json`.
- 
-If you are using the parser in conjunction with SCALES's Pacer scraper, you will likely want your input and output directories to be the scraper-generated `html` and `json` folders within your chosen court directory, as outlined [here](../downloader/README.md#directory-structure).
+ - `INPUT_DIR`: Relative path to the folder where HTMLs will be read, e.g.   `../../data/pacer/ilnd/html`
+
+If you are using the parser in conjunction with SCALES's Pacer scraper, you will likely want your input directory to be the scraper-generated `html` folder within your chosen court directory, as outlined [here](../downloader/README.md#directory-structure).  Similarly the output and summaries directories will be inferred as the `json` and `summaries` folder within that chosen court directory, but can be overriden by providing values for `output-dir` and `summaries-dir`
 
 ### Options
+- `-o, --output-dir TEXT` *(path)* The folder where the parsed JSONs will be placed into. If none is provided they will placed in `INPUT_DIR/../json/`
+- `-s, --summaries-dir TEXT` *(path)* The folder where the scraper will look for accompanying case summaries.  the parsed JSONs will be placed into. If none is provided it will deault to `INPUT_DIR/../summaries/`. See more on case summaries [below](#case-summaries)
 - `-c, --court TEXT` *(defaults to none)* The standard abbreviation for the district court being parsed, e.g. `ilnd`. If not specified, and if using the directory structure mentioned above, the parser will inference the court abbreviation from the parent folder.
 - `-d, --debug` *(flag)* Turns off concurrency in the parser. Useful for ensuring that error traces are printed properly.
 - `-f, --force-rerun` *(flag)* Tells the parser to process HTMLs even when their corresponding JSONs already exist. Useful for obtaining fresh parses after scraping updates to existing dockets.
+-  `--force-ucids` *(path)* A path to a .csv file that contais a 'ucid' column. If supplied the parser will force rerun only on HTMLs that match up with the provided UCIDs (rather than force rerunning on the entire INPATH)
 - `-nw, --n-workers INTEGER` *(defaults to 16)* Number of concurrent workers to run simultaneously - i.e., no. of simultaneous parses running.
 
 ### Shell scripts
@@ -23,10 +25,13 @@ Two shell scripts, `parse_all.sh` and `parse_subset.sh`, are provided for batch 
 
     sh parse_all.sh INPATH [OPTIONS]
     sh parse_subset.sh INPATH -s STARTDIR -e ENDDIR [OPTIONS]
-    
+
 where `INPATH` is the relative path to a parent folder containing multiple court directories, `STARTDIR` and `ENDDIR` define the inclusive alphabetical range of court directories to parse (e.g. `nyed` through `nywd`), and `OPTIONS` are any command-line options you would like to pass through to `parse_pacer.py` (e.g. `--debug`, `--force-rerun`, `--n-workers`).
 
 *Note: each court directory in the batch must include an HTML folder for input and a JSON folder for output, as is true in the scraper-generated directory structure.*
+
+
+
 
 # JSON Schema
 The following fields are inferenced from the filepath:
@@ -90,3 +95,61 @@ The following fields are pulled from the 'Transaction Receipt' at the bottom of 
 - `download_timestamp` *(string)*
 - `n_docket_reports` *(integer)* - the number of times the SCALES scraper has modified this docket (1 if there have never been updates, >1 if new docket entries have been added after the initial download)
 - `pacer_case_id` *(integer)* - the unique numerical ID that Pacer uses internally to identify this document (pulled from Pacer's XML responses to user queries; not visible on the docket sheet itself)
+
+Case summaries:
+- `summary` *(object)* - case summary information, fully documented below
+
+## Case summaries
+Case summaries can be downloaded through the SCALES scraper. They provide some additional information that is not available in the case docket reports. By default the scraper will place any downloaded summaries in the `/summaries` sub-directory of a given court directory.
+
+When the parser runs it will also parse any summaries associated with a case. It will search for the html files for these summaries in the summaries sub-directory (which can be manually specified with the `--summaries-dir` option).
+
+The schema for civil cases and criminal cases are slightly different due to PACER presenting the data in different ways. The main difference is that for criminal cases, each defendant has its own unique list of plaintiffs whereas for civil cases there is a single list of all parties in a case (including both plaintiffs and defendants).
+
+### Civil Schema
+- `case_id` (*string*) - the case id e.g. '1:16-cv-00001, All defendants'
+- `case_name` (*string*) - e.g. 'USA v. Johnson et al.'
+- `date_filed` (*string*) - the case filing date
+- `date_terminated` (*string*) - the case terminating date
+- `date_of_last_filing` (*string*) - the date of last filing in the case
+- `presiding` (*string*) - presidint judge, if any
+- `referral` (*string*) -  referred judge, if any
+- `billable_pages` (*int*) - no. of billable pages (usually just 1)
+- `cost` (*float*) - the cost of downloading the case summary (usually 0.10)
+- `download_timestamp` (*string*) - the time the case summary was downloaded
+- `defendants` (*list of objects*) - a list of defendants in the case. For each defendant there is:
+	- `plaintiffs` (*string*) - list of objects containing `role`, `represented_by` and contact fields `fax`, `email` and `phone`. Note: often non-fax related things end up in the `fax` field e.g. 'US Govt Attorney'
+	- `name` (*string*) - defendant name
+	- `ind` (*string*) -  defendant index within the case (*should* link back to the docket report)
+	- `office` (*string*) - the court office
+	- `county` (*string*) - the court county
+	- 	`filed` (*string*) - defendant-specific filing date
+	- `terminated` (*string*) - defendant-specific filing date
+	- `reopened` (*string*) - defendant-specific reopneing date
+	- `other_court_case` (*string*) - other associated cases
+	- `defendant_custody_status` (*string*) -
+	- `flags` (*list of strings*) - pacer flags that applied to the defendant e.g. ['CLOSED','PRO_SE' ]
+	- `pending_status` (*string*) -
+	- `magistrate_case` (*string*) - previous magistrate case, if any
+	-  `counts` (*list of objects*) - containing `count` (the count reference e.g. '1sss') `citation`, `offense_level` and `text` (the text associated with the count)
+	-  `complaints` (*list of objects*) - containing `citation`, `offense_level` and `text` (the text associated with the count)
+
+
+### Criminal Schema
+- `case_id` (*string*) - the case id e.g. '1:16-cv-00001, All defendants'
+- `case_name` (*string*) - e.g. 'USA v. Johnson et al.'
+- `date_filed` (*string*) - the case filing date
+- `date_terminated` (*string*) - the case terminating date
+- `date_of_last_filing` (*string*) - the date of last filing in the case
+- `presiding` (*string*) - presidint judge, if any
+- `referral` (*string*) -  referred judge, if any
+- `billable_pages` (*int*) - no. of billable pages (usually just 1)
+- `cost` (*float*) - the cost of downloading the case summary (usually 0.10)
+- `download_timestamp` (*string*) - the time the case summary was downloaded
+- `parties` (*list of objects*) - a list of parties in the case. For each party there is:
+	- `role` (*string*) - their role in the case e.g ('Plaintiff', 'Defendant')
+	- `name` (*string*) - party name
+	- `represented_by` (*string*) -  name of party's representation
+	- `fax` (*string*) - contact fax no., note: often non-fax related things end up in the `fax` field e.g. 'Pro Hac Vice', 'MDL'
+	- `email` (*string*) - contact email address
+	- 	`phone` (*string*) - contact phone no.

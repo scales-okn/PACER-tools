@@ -2,23 +2,25 @@
 
 
 
+
 # Description
 A collection of web scrapers to download data from Pacer.gov.
 The `scraper.py` script contains three scraper modules:
 
  1. Query Scraper
  2. Docket Scraper
- 3. Document Scraper
+ 3. Summary Scraper
+ 4. Document Scraper
 
-These three steps are sequential and naturally lead from one to the next. When run all together (in `all` mode) the output from each step forms the input to the next step, as summarized below:
+
 
 |  |Purpose|Input|Output
 |--|--|--|--|
 |  *Query Scraper* | Pull case query results | Query parameters | Query results page (*html*)
 |  *Docket Scraper* | Pull case dockets | Query results page | Case dockets (*html*)
+|  *Summary Scraper* | Pull case summaries| Query results page | Case summaries (*html*)
 |  *Document Scraper* | Pull case documents + attachments | Case dockets | Case documents (*pdf*)
 
-Each scraper module can also be run independently (`query`, `docket` and `document` modes respectively) with user specified inputs.
 
 
 # Getting Started
@@ -66,6 +68,10 @@ When running the scraper, a court directory will have an imposed structure as be
     |   |-- 2016cv_config.json
     |   |-- ...
     |
+    |-- summaries		# Downloaded case summaries
+    |   |-- 1-16-cv-00001.html
+    |   |-- ...
+    |
     |-- docs			# Downloaded documents and attachments
     |   |-- ilnd;;1-16-cv-00001_1_2_u7905a347_t200916.pdf
     |   |-- ...
@@ -107,7 +113,7 @@ To run the scraper:
 The options passed to the scraper can be grouped into the following four categories:
 
 *General* *(apply to all three modules)*
- - `-m, --mode` *[all|query|docket|document]*
+ - `-m, --mode` *[query|docket|summary|document]*
  Whether to run a single scraper module are all three in sequence.
 
  - `-a, --auth-path`
@@ -134,13 +140,16 @@ Override the time restrictions and run scraper regardless of current time.
 
  - `--case-limit INTEGER`
 Sets limit on maximum no. of cases to process (enter 'false' or 'f' for no limit). This will be applied to limit:
-  - the no. of case dockets the docket scraper pulls
-  - the no. of case dockets the document scraper takes as an input
+	  - the no. of case dockets the docket scraper pulls
+	  - the no. of case dockets the document scraper takes as an input
 
 *Query Scraper*
 
  - `-qc, --query-conf`
  Configuration file (.json) for the query that will be used to populate the query form on Pacer. If none is specified the query builder will run in the terminal.
+
+  - `--query-prefix TEXT`
+  A prefix for the filenames of output query HTMLs. If date range of the query is greater than 180 days, the query will be split into chunks of 31 days to prevent PACER crashing while serving a large query results page. Multiple files will be created that follow the pattern `{query_prefix}__i.html` where `i` enumerates over the date range chunks.
 
 *Docket Scraper*
 
@@ -162,6 +171,10 @@ Relative path to a csv file with a column of UCIDs that are cases to be excluded
 
 - `--docket-update`
 Check for new docket lines in existing cases.  A `--docket-input` must also be provided. If the docket input is a csv, a `latest_date` column can be provided to give the latest date across docket lines for each case. This date (+1) is passed to the "date filed from" field in Pacer when the docket report is generated. If no `latest_date` column provided for a case that has been previously downloaded, the date is calculated from the case json.
+
+*Summary Scraper*
+- `--summary-input TEXT`
+Similar to `--docket-input`. A relative path that is the input for the Summary Scraper module: this can be a single query result page (.html), a directory of query html files or a csv with UCIDs.
 
 *Document Scraper*
 

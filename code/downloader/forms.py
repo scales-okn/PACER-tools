@@ -1,6 +1,5 @@
 import sys
 import time
-import pdb
 import json
 from pathlib import Path
 
@@ -45,10 +44,11 @@ class FormField:
             if self.value != current_state:
                 self.locate().click()
 
+        # Selector for select should be for the select tag (not the options)
         elif self.kind == 'select':
-            options = self.locate(get_many=True)
-            chosen = [el for el in options \
-                      if _clean_options_(el, first_only=False) == self.value][0]
+            select_tag = self.locate()
+            # Set the value manually which is same as what happens in fill_text
+            fill_text(self.selector, self.value, self.browser)
 
         # Locator fn for select should return array of elements
         elif self.kind == 'multiselect':
@@ -58,7 +58,6 @@ class FormField:
             subset = [el for el in options if _clean_options_(el) in values]
             for el in subset:
                 el.click()
-            # pdb.set_trace()
 
     def __repr__(self):
         return f'''<FormField: "{self.name}" (kind:{self.kind})>'''
@@ -236,19 +235,26 @@ TEMPLATE_DOCKET_SHEET = {
             'choices': ['html', 'pdf'],
             'default': 'html'
         },
+        'sort_by': {
+            'kind': 'select',
+            'selector': 'select[name="sort1"]',
+            'choices': ['oldest date first', 'most recent date first', 'document number'],
+            'default': 'html'
+        },
     },
     'buttons': {
         'submit': 'input[value^="Run"]'
     },
-    'pre_submit': lambda form: docket_pre_submit(form)
+    'pre_submit': lambda form: case_no_pre_submit(form)
 }
-def docket_pre_submit(form):
-    '''Hit enter on case_number field to start the lookup'''
-    case_num = form.fields['case_no'].locate()
-    case_num.send_keys(Keys.RETURN)
+def case_no_pre_submit(form):
+    '''Hit enter on case number field to start the lookup'''
 
-    # Case selector area appears for ambiguous case name (often when it's not even ambigious)
-    case_selector = form.browser.find_element_by_id('case_number_pick_area_0')
+    if 'case_no' in form.fields:
+        case_num = form.fields['case_no'].locate()
+        case_num.send_keys(Keys.RETURN)
+
+
     run_button = form.buttons['submit'].locate()
 
     # Wait for the case lookup to run before you can 'Run Report'
@@ -360,7 +366,7 @@ TEMPLATE_QUERY = {
         },
         'person_type':{
             'kind': 'select',
-            'selector': 'select#person_type option',
+            'selector': 'select#person_type',
             'type': str,
             'example': '8:16-cv-00750',
             'choices':['Attorney','Party', ''],
@@ -370,7 +376,8 @@ TEMPLATE_QUERY = {
     'buttons': {
         'submit': 'input[type="button"][value="Run Query"]',
         'find_this_case': 'input#case_number_find_button_0'
-    }
+    },
+    'pre_submit': lambda form: case_no_pre_submit(form)
 }
 
 def get_template(s):

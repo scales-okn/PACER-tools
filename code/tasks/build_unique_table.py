@@ -19,8 +19,11 @@ def main(outfile, nrows):
     if nrows:
         nrows = int(nrows)
 
-    dtools.generate_unique_filepaths(outfile, to_file=True, n=nrows)
-    print(f"File output to {Path(outfile).resolve()}")
+    df = dtools.generate_unique_filepaths(outfile, nrows)
+    print(f"\nUnique filepaths table (with shape {df.shape}) output to {Path(outfile).resolve()}")
+
+    exist_count = df.fpath.map(lambda x: (settings.PROJECT_ROOT/x).exists()).sum()
+    print(f'\nFile existence check: {exist_count:,} / {len(df):,}')
 
 if __name__ == '__main__':
     main()

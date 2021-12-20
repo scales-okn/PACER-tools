@@ -16,7 +16,14 @@ re_card = '|'.join(x[0].lower() for x in CARDINALS)
 re_court_abbrev = rf"^(?P<state_code>{re_state_codes})(?P<ord_code>({re_card})?)d$"
 
 # Read in court data
-courtdf = pd.read_csv(settings.COURTFILE).dropna(how='all')
+courtdf = pd.read_csv(settings.COURTFILE, index_col=0)
+
+abbr2name_dict = dict(zip(courtdf.index, courtdf.courtname))
+name2abbr_dict = dict(zip(courtdf.courtname, courtdf.index))
+
+# Full name like "Oklahoma Western", useful for fjc
+full_name = (courtdf.state +' ' +  courtdf.cardinal.fillna('')).str.strip()
+fullname2abbr_dict = dict(zip(full_name,courtdf.index))
 
 def make_courtname(row):
     '''
@@ -24,21 +31,12 @@ def make_courtname(row):
     '''
     courtname = ''
 
-    if type(row.Cardinal) == str:
-        courtname += row.Cardinal + '-'
+    if type(row.cardinal) == str:
+        courtname += row.cardinal + '-'
 
-    courtname += row.State
+    courtname += row.state
     courtname = courtname.lower().replace(' ','-')
     return courtname
-
-#Create courtname column
-courtdf['courtname'] = courtdf.apply(lambda x: make_courtname(x), axis=1)
-abbr2name_dict = dict(zip(courtdf.Abbreviation, courtdf.courtname))
-name2abbr_dict = dict(zip(courtdf.courtname, courtdf.Abbreviation))
-
-# Full name like "Oklahoma Western", useful for fjc
-full_name = (courtdf.State +' ' +  courtdf.Cardinal.fillna('')).str.strip()
-fullname2abbr_dict = dict(zip(full_name,courtdf.Abbreviation))
 
 def abbr2name(abbr):
     '''
@@ -83,9 +81,9 @@ def abbr2full(abbr):
     '''
     #Get the court abbreviation cardinal direction and state name from the court dataframe
     try:
-        cardinal = courtdf[courtdf.Abbreviation.eq(abbr)].Cardinal.values[0]
+        cardinal = courtdf[courtdf.index.eq(abbr)].cardinal.values[0]
         cardinal = cardinal + ' ' if (type(cardinal)==str) else ''
-        state = courtdf[courtdf.Abbreviation.eq(abbr)].State.values[0]
+        state = courtdf[courtdf.index.eq(abbr)].state.values[0]
 
         #Make the string
         return  f"U.S. District Court for the {cardinal}District of {state}"

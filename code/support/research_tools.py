@@ -28,21 +28,20 @@ def pattern_matcher(patterns, text_str):
 
     return {name: _get_span_(re.search(pattern, text_str,re.I)) for name,pattern in patterns.items()}
 
-def wide_net_match_line(docket_line, case, wide_net=[], match_fn=None):
+def wide_net_match_line(docket_line, case, wide_net=[], wide_net_fn=None):
     '''
-    Check single docket line for wide net match
+    Check single docket line for wide net match, or uses wide_net_fn if supplied
     Inputs:
         - docket_line (list): a single docket line
         - case (json): The case json
         - wide_net (list): a list of regex patterns co ca
         - match_fn (function): a match function to run if no docket_patterns supplied
     '''
-    if len(wide_net):
-        ## TODO: Verify this full pattern works
+    if wide_net_fn is not None:
+        return wide_net_fn(docket_line, case)
+    else:
         full_pattern = '|'.join(f"({pat})" for pat in wide_net)
         return bool(re.search(full_pattern, docket_line['docket_text'], re.I))
-    else:
-        return match_fn(docket_line, case)
 
 def row_builder(docket_line, ind, case, fpath, patterns, computed_attrs={},  rlim=None):
     '''
@@ -66,7 +65,7 @@ def row_builder(docket_line, ind, case, fpath, patterns, computed_attrs={},  rli
         **{k: fn(case) for k,fn in case_metadata.items()},
         'fpath': fpath,
         'date': docket_line['date_filed'],
-        'ind':ind,
+        'ind': ind,
         'text': docket_line['docket_text'][:100],
         # Computed attribues
         **{k: fn(docket_line, case) for k,fn in computed_attrs.items()},
@@ -75,38 +74,56 @@ def row_builder(docket_line, ind, case, fpath, patterns, computed_attrs={},  rli
     }
     return row
 
-def get_case_matches(fpath, patterns, wide_net, computed_attrs={}, rlim=None, line_match_fn=None):
+def get_case_matches(fpath, patterns, wide_net,
+                    computed_attrs={}, rlim=None, wide_net_fn=None, skip_non_matches=False):
     '''
     Process a case and return observation rows
 
     Output:
-    A list of obersvation rows
+    (list) of obersvation rows (dicts)
     '''
+
     case_rows = []
     case = dtools.load_case(fpath)
 
     for ind, line in enumerate(case['docket']):
 
-        if wide_net_match_line(line, case, wide_net, line_match_fn):
+        if wide_net_match_line(line, case, wide_net, wide_net_fn):
             # Use row builder
             row = row_builder(docket_line=line, ind=ind, case=case, fpath=fpath,
                     patterns=patterns, computed_attrs=computed_attrs, rlim=rlim)
+
+            if skip_non_matches:
+                # Only add row if at least one pattern match
+                if not any(v for k,v in row.items() if k in patterns):
+                    continue
+
             case_rows.append(row)
+
     return case_rows
 
-def docket_searcher(case_paths, outfile, wide_net, patterns, computed_attrs={}, rlim=None, line_match_fn=None):
+def docket_searcher(case_paths, outfile, patterns, wide_net=[], computed_attrs={},
+                     rlim=None, wide_net_fn=None, skip_non_matches=False):
     '''
     Main function to build results set from criteria
 
     Inputs:
-        - case_paths (list): list of filepaths
+        - case_paths (iterable): list of filepaths
         - outfile (str or Path): path to output file (.csv)
         - patterns (dict): a dictionary of patterns
         - wide_net (list): a list of wide regex patterns to match on docket lines
         - computed_attrs (dict): a dictionary of computed attributes
                         (named functions that take (docket_line, case) inputs)
-        - rlim (int): right limit on docket line to analyze
+        - rlim (int): right limit on characters in docket text to analyze
+        - wide_net_fn (function): a function that takes (docket_line, case) arguments,
+           where docket_line is dict (from the case['docket'] array) and case is the case dict,
+           and maps to a boolean, if supplied will be used to decide on a row match instead of wide_net
+        - skip_non_matches (bool): Useful for debugging/exploring, if true then
+          rows that match the wide net but have no pattern matches are not written to outfile
     '''
+    if (not len(wide_net)) and (wide_net_fn is None):
+        raise ValueError('Must supply either wide_net or wide_net_fn')
+
     # Get table column headers
     headers = [*case_metadata.keys(), 'fpath', 'date','ind', 'text', *computed_attrs.keys(), *patterns.keys()]
 
@@ -116,13 +133,15 @@ def docket_searcher(case_paths, outfile, wide_net, patterns, computed_attrs={}, 
         writer.writerow(headers)
 
         for fpath in case_paths:
-            case_rows = get_case_matches(fpath, patterns, wide_net, computed_attrs, rlim, line_match_fn)
-            print(f"<case:{fpath}> found {len(case_rows)} matches")
+            case_rows = get_case_matches(fpath, patterns, wide_net, computed_attrs, rlim, wide_net_fn, skip_non_matches)
+            print(f"<case:{fpath}> found {len(case_rows)} rows with matches")
 
             if len(case_rows):
                 # Write to file
                 for row_dict in case_rows:
                     # Ensure ordered printing by headers
+
+                    #TODO: make this an append
                     writer.writerow(row_dict[k] for k in headers)
 
     print(f'Docket Searcher complete, results located at {outfile}')

@@ -60,18 +60,51 @@ IDB_COLS = {
     'TRCLACT': {'dtype': np.int16,'recap_key': 'termination_class_action_status'},
     'TRMARB': {'dtype': str, 'recap_key': 'arbitration_at_termination'}
 }
+BARE_MIN_COLS = ['DOCKET','OFFICE', 'DISTRICT', 'FILEDATE']
 
-def load_data(case_type, years, nrows=None, all_cols=False, cols=[]):
+def make_ucid_and_weak(docket, office, district, case_type):
     '''
-    Load fjc data. Assumes that the relevant files exist and are in the settings.IDB folder
+    Make the ucid and weak_ucid from idb data. Can take str values for a single row,
+    or can take series and output as Series.
 
     Inputs:
-        - case_type (str): 'cr' or 'cv'
-        - years (list): list of years (ints) to load
+        - docket (str or Series): idb 'docket' looks like 1600123 for year=16, case_no=00123
+        - office (str or Series): idb office #
+        - district (str or Series): court abbreviation e.g. 'ilnd'
+        - case_type (str): 'cv' or 'cr'
+
+    Outputs:
+        - ucid (str or Series): looks like 'ilnd;;1:16-cv-00123'
+        - ucid_weak (str or Series): ucid with office removed, looks like 'ilnd;;16-cv-00001'
+    '''
+    # Find the ucid and weak_ucid
+    # data = {k:row[columns.index(k)] for k in ['DOCKET', 'DISTRICT', 'OFFICE']}
+    if type(docket) is pd.Series:
+        case_year = docket.str.slice(0,2)
+        case_no = docket.str.slice(2,)
+    else:
+        case_year = docket[:2]
+        case_no = docket[2:]
+
+    # court = IDB_COLS['DISTRICT']['conv'](data['DISTRICT'])
+
+    ucid = dtools.ucid_from_scratch(district, office, case_year, case_type, case_no)
+    ucid_weak = dtools.get_ucid_weak(ucid)
+    return ucid, ucid_weak
+
+def load_idb_csv(fpath, case_type, nrows=None, all_cols=False, cols=[]):
+    '''
+    Load fjc data from a .csv (a sas file that's been converted by fjc.convert_sas7).
+    Converts the district to abbreviation, manages datatypes according to IDB_COLS,
+    puts all column names in lowercase, fixes na dates encoded as 1900,
+    creates ucid and weak_ucid columns
+
+    Inputs:
+        - fpath (str or Path): the path to load e.g. settings.FJC/'cv10to20.csv'
+        - case_type (str): must specify 'cr' or 'cv' (because of different datasets/columns)
         - nrows (int): nrows to load from the csv if not all
-        - recap_cols (bool): whether to just load the columns incorporated in Recap as 'idb_data'
         - all_cols (bool): whether to load all columns, if false loads recap columns
-        - cols (list): specific list of columns to load
+        - cols (list): specific list of columns to load if all_cols=False
     Output:
         DataFrame
     '''
@@ -81,30 +114,33 @@ def load_data(case_type, years, nrows=None, all_cols=False, cols=[]):
         usecols = cols
     else:
         # Get all the recap columns
-        usecols = ['ucid', 'ucid_weak'] +  \
-                  [x.upper() for x in get_recap_idb_cols(case_type)]
+        usecols =  [x.upper() for x in get_recap_idb_cols(case_type)]
 
-    csvs = [settings.IDB/f"{case_type}{year}.csv" for year in years]
-    for file in csvs:
-        if not file.exists():
-            print(f"The file {file.name} does not exist, skipping")
-            csvs.remove(file)
-
-    df_list = []
-
-    for file in csvs:
-        df_year = pd.read_csv(file, nrows=nrows, encoding="utf-8", usecols=usecols,
-                     converters={k:v['conv'] for k,v in IDB_COLS.items() if v.get('conv')},
-                     dtype={k:v['dtype'] for k,v in IDB_COLS.items() if v.get('dtype')},
-                  )
-
-        df_list.append(df_year)
-
-    df = pd.concat(df_list, ignore_index=True)
+    # csvs = [settings.IDB/f"{case_type}{year}.csv" for year in years]
+    # for file in csvs:
+    #     if not file.exists():
+    #         print(f"The file {file.name} does not exist, skipping")
+    #         csvs.remove(file)
+    #
+    # df_list = []
+    #
+    # for file in csvs:
+    #     df_year = pd.read_csv(file, nrows=nrows, encoding="utf-8", usecols=usecols,
+    #                  converters={k:v['conv'] for k,v in IDB_COLS.items() if v.get('conv')},
+    #                  dtype={k:v['dtype'] for k,v in IDB_COLS.items() if v.get('dtype')},
+    #               )
+    #
+    #     df_list.append(df_year)
+    #
+    # df = pd.concat(df_list, ignore_index=True)
+    df = pd.read_csv(fpath, nrows=nrows, encoding="utf-8", usecols=usecols,
+                 converters={k:v['conv'] for k,v in IDB_COLS.items() if v.get('conv')},
+                 dtype={k:v['dtype'] for k,v in IDB_COLS.items() if v.get('dtype')},
+    )
 
     # Ensuring column ordering
     if usecols:
-        df_year = df_year[usecols]
+        df = df[usecols]
 
     # Lowercase column names
     df.columns = [col_name.lower() for col_name in df.columns]
@@ -114,6 +150,11 @@ def load_data(case_type, years, nrows=None, all_cols=False, cols=[]):
         if date_col in df.columns:
             idx_na = df[df[date_col].eq(DATE_NA)].index
             df.loc[idx_na, date_col] = None
+
+    # Make ucid and weak_ucid columns and insert at the front
+    ucid, ucid_weak = make_ucid_and_weak(df.docket, df.office, df.district, case_type)
+    df.insert(0, 'ucid', ucid)
+    df.insert(1, 'ucid_weak', ucid_weak)
 
     return df
 
@@ -210,7 +251,7 @@ def convert_sas7(infile, outfile=None, dir=None, n_rows=None):
                         break
 
 
-def split_txt(old_file, out_dir, case_type, year_lb, nrows=None):
+def split_txt(old_file, out_dir, case_type, year_lb=0, nrows=None, year_var='DOCKET'):
     '''
     Cut one of the large .txt tab-delimited IDB datasets into multiple csv files, by year.
 
@@ -220,6 +261,7 @@ def split_txt(old_file, out_dir, case_type, year_lb, nrows=None):
         - case_type ('cv' or 'cr')
         - year_lb (int): lower bound on year, to filter out rows with filedate below
         - nrows (int): max number of rows to write (for testing small samples)
+        - year_var ('DOCKET', 'FILEDATE'): which IDB varibale to get the year from (for file splitting)
     '''
 
     # Create directory if it doesn't exist
@@ -231,7 +273,6 @@ def split_txt(old_file, out_dir, case_type, year_lb, nrows=None):
         # Get the column headers from the first line
         columns = rfile.readline().rstrip('\n').split('\t')
         ind_filedate = columns.index('FILEDATE')
-
         write_count = 0
 
         # Session dictionary to map year to open csv writers
@@ -245,18 +286,29 @@ def split_txt(old_file, out_dir, case_type, year_lb, nrows=None):
                 continue
 
             # Filter by year lower bound
-            year = int(row[ind_filedate].split('/')[-1])
-            if year < year_lb:
+            file_year = int(row[ind_filedate].split('/')[-1])
+            if file_year < year_lb:
                 continue
 
+            if year_var=='FILEDATE':
+                split_year = file_year
+
+            elif year_var=='DOCKET':
+                # Use the year from the DOCKET variable e.g.g 1600001 -> 16
+                ind_docket = columns.index('DOCKET')
+                split_year = row[ind_docket][:2]
+            else:
+                raise ValueError("`year_var` must be in ('FILEDATE','DOCKET')")
+
+
             # Check if we have a csv for 'year' and if not, start it up
-            if year not in session.keys():
-                filepath = out_dir/f"{case_type}{year}.csv"
-                session[year] = {'file': open(filepath, 'w', encoding="utf-8",
+            if split_year not in session.keys():
+                filepath = out_dir/f"{case_type}{split_year}.csv"
+                session[split_year] = {'file': open(filepath, 'w', encoding="utf-8",
                                                 newline='\n')}
-                session[year]['writer'] = csv.writer(session[year]['file'])
+                session[split_year]['writer'] = csv.writer(session[split_year]['file'])
                 # Write the header row for this new file
-                session[year]['writer'].writerow(['ucid','ucid_weak', *columns])
+                session[split_year]['writer'].writerow(['ucid','ucid_weak', *columns])
 
             # Find the ucid and weak_ucid
             data = {k:row[columns.index(k)] for k in ['DOCKET', 'DISTRICT', 'OFFICE']}
@@ -267,7 +319,7 @@ def split_txt(old_file, out_dir, case_type, year_lb, nrows=None):
             ucid_weak = dtools.get_ucid_weak(ucid)
 
             # Write the new row, which is (ucid, ucid_weak, <<original row data>>)
-            session[year]['writer'].writerow([ucid,ucid_weak,*row])
+            session[split_year]['writer'].writerow([ucid,ucid_weak,*row])
 
             write_count += 1
             if nrows:
@@ -277,54 +329,54 @@ def split_txt(old_file, out_dir, case_type, year_lb, nrows=None):
     for v in session.values():
         v['file'].close()
 
-def idb_merge(years, case_type, year_buffer=1, dframe=None):
+def idb_merge(idb_data_file, case_type, preloaded_idb_data_file=None, dframe=None):
     '''
     Merge dataframe of cases with idb data
 
     Inputs
-        - years (list): list of ints of years e.g. [2016,2017]
-        - case_type ('cv' or 'cr')
-        - year_buffer (int): no. of years +- to look in idb
-            e.g. if years=[2016] and year_buffer=1, idb data for (2015,2017) will be used
+        - idb_data_file (str or Path): the idb csv file to use e.g. 'cv10to19.csv'
+        - case_type (str): the case type ('cv' or 'cr') of the cases in the idb file provided
+        - preloaded_idb_data_file (DataFrame): specify a preloaded IDB dataframe, e.g. if the consumer has already called load_idb_csv
         - dframe (DataFrame): specify table of case files, instead of using all of unique files table
     Outputs
         - final (DataFrame): the merged table
         - match_rate (float): the no. of original casefiles matched against idb
     '''
-    import pdb
-    pdb.set_trace()
     if dframe is None:
         dff = dtools.load_unique_files_df()
-        dff = dff[dff.case_type.eq(case_type) & dff.year.isin(years)].copy()
+        dff = dff[dff.case_type.eq(case_type)].copy()
     else:
         dff = dframe.copy()
     N = dff.shape[0]
-    print(f"\n{N:,} case files provided")
+    print(f"\n{N:,} SCALES cases provided")
 
     # Make sure there's a ucid column
     dff.reset_index(inplace=True)
-    dff['ucid_copy'] = dff['ucid']
-    years.sort()
+    dff['ucid_copy'] = dff['ucid'].copy()
 
-    # Create wider range for idb_years
-    idb_years = list(range(years[0]-year_buffer, years[-1] + year_buffer + 1))
-    print(f"Loading IDB {settings.CTYPES[case_type]} data for years: {','.join(str(x) for x in idb_years)}...")
-
-    # Load idb data, sort and drop dupes
-    df_idb = load_data(case_type, years=idb_years)
+    if preloaded_idb_data_file is not None:
+        df_idb = preloaded_idb_data_file
+    else:
+        print(f'Loading idb file: {idb_data_file}...')
+        df_idb = load_idb_csv(idb_data_file, case_type=case_type, cols=BARE_MIN_COLS)
     df_idb.sort_values(['ucid', 'filedate'], inplace=True)
     df_idb.drop_duplicates('ucid', keep='first', inplace=True)
 
     #Stage 1 (matching on ucid)
+    print(f'STAGE 1: matching on ucid...')
     matched_mask = dff.ucid.isin(df_idb.ucid)
     matched_ucids = dff.ucid[matched_mask]
-    keepcols = ['fpath', 'case_type', 'filing_date', 'terminating_date', 'recap', # columns from unique files table
-                 *[x.lower() for x in get_recap_idb_cols(case_type)] ]
+    keepcols = ['fpath', 'case_type', 'filing_date', 'terminating_date', 'source',
+                *[x.lower() for x in BARE_MIN_COLS]]
+                 # *[x.lower() for x in get_recap_idb_cols(case_type)] ]
+    if 'nos_subtype' in dff.columns:
+        keepcols.append('nos_subtype')
 
     # Make table of data merged on ucid
+    print(f'STAGE 1: merging...')
     merged_ucid = dff[matched_mask].merge(df_idb, how='inner', left_on='ucid', right_on='ucid')\
         .set_index('ucid_copy')[keepcols]
-    print(f'STAGE 1 {{matched:{sum(matched_mask):,}, unmatched:{sum(~matched_mask):,} }}')
+    print(f'STAGE 1: {{matched:{sum(matched_mask):,}, unmatched:{sum(~matched_mask):,} }}')
 
     # Reduce dff to unmatched
     dff = dff[~matched_mask].copy()
@@ -332,9 +384,11 @@ def idb_merge(years, case_type, year_buffer=1, dframe=None):
     dff['ucid_weak'] = dtools.get_ucid_weak(dff.ucid)
 
     # Remove matched from df_idb and reduce to weak_ucid match
+    print(f'STAGE 2: matching on weak_ucid...')
     df_idb = df_idb[~df_idb.ucid.isin(matched_ucids) & df_idb.ucid_weak.isin(dff.ucid_weak)]
 
     # Stage 2 (matching on ucid_weak and filing date)
+    print(f'STAGE 2: merging...')
     merged_weak = dff.merge(df_idb, how="inner", left_on=['ucid_weak','filing_date'],
                              right_on=['ucid_weak', 'filedate'])\
                              .set_index('ucid_copy')[keepcols]

@@ -19,8 +19,14 @@ from support import data_tools as dtools
 from support import fhandle_tools as ftools
 
 # Default runtime hours
-PACER_HOURS_START = 20
-PACER_HOURS_END = 4
+PACER_HOURS_START = 18
+PACER_HOURS_END = 6
+
+GODLS = {
+    # Ordered list of goDLS arguments
+    'args': ['action', 'caseid', 'de_seq_num','got_receipt','pdf_header',
+             'pdf_toggle_possible', 'magic_num', 'hdr']
+}
 
 # Misc re
 re_no_docket = r'(There are )?(P|p)roceedings for case .{1,50} (but none satisfy the selection criteria|are not available)'
@@ -104,6 +110,8 @@ def login(browser, auth, login_url=None, logging=None):
     if "Invalid username or password" in browser.page_source:
         logging.error('Invalid Username or Password')
         return False
+    elif ': timeout error.' in browser.page_source:
+        logging.error('PACER login timeout error')
     else:
         if logging:
             logging.info('Login succesful')
@@ -310,6 +318,10 @@ def get_pacer_url(court, page):
         return base_url + 'doc1'
     elif page == 'possible_case':
         return base_url + 'cgi-bin/possible_case_numbers.pl'
+    elif page == 'members':
+        return base_url + 'cgi-bin/AsccaseDisplay.pl'
+    elif page == 'history':
+        return base_url + 'cgi-bin/HistDocQry.pl'
 
 def remap_date_year_backwards_to_forwards(xdate):
     '''
@@ -349,7 +361,7 @@ def is_logged_in(browser):
     # Clean the link text and return true if logout is in
     return 'logout' in [link.text.lower().replace(' ','').strip() for link in nav_links]
 
-def get_firefox_options(download_dir):
+def get_firefox_options(download_dir, headless=False):
     '''Default options for firefox'''
     options = FirefoxOptions()
     options.set_preference("browser.download.folderList", 2)
@@ -357,6 +369,7 @@ def get_firefox_options(download_dir):
     options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/pdf")
     options.set_preference("plugin.disable_full_page_plugin_for_types", "application/pdf")
     options.set_preference("pdfjs.disabled", True)
+    options.headless = headless
     return options
 
 def get_time_central(as_string=False):
@@ -420,3 +433,80 @@ def get_member_list_span(case_string):
         return match.span()
     else:
         return None,None
+
+
+def get_update_task_file(update_csv_path):
+    '''
+    Get path to the session file that corresponds with a docket update CSV
+    e.g. {dir} / update1.csv -> {dir} / update1.task.jsonl
+
+
+    Inputs:
+        - update_csv_path (str or Path): path to the csv update file
+    '''
+    p = Path(update_csv_path).resolve()
+    fname = p.stem
+    return p.parent / f"{fname}.task.jsonl"
+
+def build_wanted_doc_nos(doc_no):
+    '''
+
+    Take scraper input for document numbers to download (for a single case) and parse (formerly ftools.parse_document_no)
+    Input:
+        - doc_no (str): a comma-delimited list of doc nos that can be one of 3 things:
+                        [1: a single doc e.g. 3][2: an attachment e.g. 3_1][3: a range e.g. 5:7 (inclusive)]
+    Output:
+        wanted_doc_nos: a dict of (row number, list of docs) key-value pairs where '0' is a placeholder to dowload the line doc
+                        e.g. { '1': ['0', '4', '5'],  '2': ['0'], '3': ['9'] }
+    '''
+    re_doc = r'^\d+$'
+    re_att = r'^\d+_\d+(\:\d+)?$'
+    re_range = r'^\d+\:\d+$'
+
+    doc_no = str(doc_no).replace(' ','').strip()
+    doc_list = []
+
+    # Parse all to extrapolate from ranges
+    chunks = doc_no.split(',')
+    for chunk in chunks:
+
+        # For line doc e.g. just "3"
+        if re.match(re_doc, chunk):
+            doc_list.append(chunk)
+
+        # Attachment
+        elif re.match(re_att, chunk):
+            doc, att = chunk.split('_')
+
+            # x_y
+            if re.match(re_doc, att):
+                doc_list.append(chunk)
+
+            # x_y:z
+            elif re.match(re_range, att):
+                a,b = [int(x) for x in att.split(':')]
+                doc_list.extend([f"{doc}_{x}" for x in range(a, b+1)])
+
+        # Range (x:y)
+        elif re.match(re_range, chunk):
+            a,b = [int(x) for x in chunk.split(':')]
+            doc_list.extend([str(x) for x in range(a,b+1)])
+
+    # Sort the list, need the assumption of sorted for next part
+    doc_list = sorted(set(doc_list))
+
+    # After extrapolation of ranges compile a dict of results
+    wanted_doc_nos = {}
+    for doc_no in doc_list:
+        if re.match(re_doc, doc_no):
+            wanted_doc_nos[doc_no] = []
+            wanted_doc_nos[doc_no].append('0')
+
+        elif re.match(re_att, doc_no):
+            line_no, att_no = doc_no.split('_')
+            if line_no not in wanted_doc_nos.keys():
+                wanted_doc_nos[line_no] = []
+
+            wanted_doc_nos[line_no].append(att_no)
+
+    return wanted_doc_nos

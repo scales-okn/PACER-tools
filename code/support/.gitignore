@@ -3,6 +3,7 @@ data/*
 **/*.auth
 *.pyc
 *.key
+*.env
 noacri.db
 **/.ipynb_checkpoints/*
 **/_examples/*
