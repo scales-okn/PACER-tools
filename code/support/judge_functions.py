@@ -11,9 +11,7 @@ from support import court_functions as cf
 from support import data_tools as dtools
 from support import fhandle_tools as ftools
 
-DF_SEL, DF_JEL = None, None
 NAN_NAMES = {'not_found': 'XXNaNXX', 'committee': 'XXNon-IndividualXX'}
-IGNORE_CASE = 'Void'
 
 int_magistrate = 9999999
 committee_names = {'Respondent':10000001, 'Unassigned':10000002, \
@@ -32,55 +30,28 @@ today = datetime.datetime.today()
 timestamp = str(today.day) + str(today.month) + str(today.year)
 DATAPATH = 'data/'
 
-
-
 ####################
 ### File getters ###
 ####################
 
-def get_sel(court=None, reload_sel=False):
+def load_JEL():
+    ''' Load the JEL file '''
+    return pd.read_json(settings.JEL_JSONL, lines=True)
+
+def load_SEL(ucid, as_df = True):
     '''
-    Get the spacy entity lookup DataFrame, if it's first time calling it will read in the dframe
+    Load SEL data (from relevant .jsonl files in the SEL_DIR)
 
     Inputs:
-        - court (str): optional, if supplied (and if first time calling getter),
-        it will filter sel down to only that court
+        - ucid (str or iterable): can be a single ucid (str) or any iterable (list / pd.Series)
+        - as_df (bool): if true returns as type pd.DataFrame, otherwise list of dicts
+
     Output:
-        (pd.DataFrame) the sel dataframe
-
+        (pd.DataFrame or list of dicts) SEL data for the given ucid(s)
     '''
-    global DF_SEL
-    if type(DF_SEL) == type(None) or reload_sel:
-        print("Reading in SEL...")
-        DF_SEL = pd.read_csv(settings.DF_SEL,dtype={'SCALES_JID':str})
-        print("...Complete")
 
-        if court:
-            print(f"Reducing SEL... to only {court}")
-            DF_SEL= DF_SEL[DF_SEL.ucid.apply(lambda x: court in x)]
-
-        # Mapping span and scales_ind of 'header' matches to -1
-        DF_SEL['char_span_start'] = DF_SEL['char_span_start'].apply(lambda x: int(x) if x!='H' else -1)
-        DF_SEL['char_span_end'] = DF_SEL['char_span_end'].apply(lambda x: int(x) if x!='H' else -1)
-        DF_SEL['docket_index'] = DF_SEL['docket_index'].apply(lambda x: int(x) if x!='H' else -1)
-    return DF_SEL
-
-def get_jel():
-    ''' Get the judge entity lookup DataFrame, if it's first time calling it will read in the dframe'''
-    global DF_JEL
-    if type(DF_JEL) == type(None):
-        print("Reading in JEL...")
-        DF_JEL = pd.read_json(settings.JEL_JSONL, lines=True)
-        DF_JEL.loc[~DF_JEL.NID.isna(), "NID"] = DF_JEL.NID.apply(lambda x: str(x).split('.')[0])
-        print("...Complete")
-    return DF_JEL
-
-
-def load_SEL(ucid = None, as_df = True):
-    if not ucid:
-        print("Please specify the ucid or list of ucids to load")
-
-    if type(ucid) != list:
+    # Coerce to an iterable
+    if type(ucid) is str:
         ucid = [ucid]
 
     SEL_rows = []
@@ -96,415 +67,17 @@ def load_SEL(ucid = None, as_df = True):
                     results.append(json.loads(json_str))
 
         SEL_rows+=results
-    
+
     # return dataframe
     if SEL_rows:
         if as_df:
             SEL = pd.DataFrame(SEL_rows)
         else:
             SEL = SEL_rows
-        
+
         return SEL
     else:
-        return "No data found"
-
-######################################################
-### Judge ID functions for build_judge_ifp_data.py ###
-######################################################
-
-def encrypt_judge(name):
-    if name not in NAN_NAMES.values():
-        return dtools.sign(name.encode('UTF-8'))
-    else:
-        return name
-
-def jid_to_judge_name(jid):
-    if jid not in NAN_NAMES.values():
-        JEL = get_jel()
-        subdf = JEL[JEL['SCALES_JID']==float(jid)]
-        if len(subdf.index) == 1:
-            return subdf.iloc[0]['Presentable_Name']
-    return None
-
-def check_neighborhood_exact_match(ucid, starting_point, order, statuses):
-
-    preceding = [stat for stat in statuses if stat[0] < starting_point]
-    succeeding = [stat for stat in statuses if stat[0] > starting_point]
-
-    preceding = sorted(preceding, key = lambda tup: tup[0], reverse=True)
-    succeeding = sorted(succeeding, key = lambda tup: tup[0], reverse=False)
-
-    if order == 'preceding_first':
-        run = [preceding, succeeding]
-    else:
-        run = [succeeding, preceding]
-
-    for each in run:
-
-        for i, line in enumerate(each):
-            exact = check_if_direct_entry_match(ucid, line[0],line[2])
-            if exact:
-                return exact
-
-    return None
-
-def check_mode_between_lines(ucid, app_line, reso_line):
-    SEL = get_sel()
-    docket_lines = SEL[SEL.ucid ==ucid]
-
-    relevant_lines = docket_lines[(docket_lines.docket_index <= reso_line) &
-                                 (docket_lines.docket_index >= app_line)]
-    relevant_lines = relevant_lines[~relevant_lines.SCALES_JID.isna()]
-
-    if len(relevant_lines) == 0:
-        #print("No Judges Between IFP Lines")
         return None
-
-    mode_judges = relevant_lines[['SCALES_JID']].mode()
-    if len(mode_judges) == 1:
-        SJID = mode_judges.SCALES_JID.iloc[0]
-        if pd.isnull(SJID):
-            return None
-        else:
-            return SJID
-    else:
-        #print("Multi-Modal")
-        return None
-
-
-def check_only_one_span_overlap(span_of_interest, SEL_spans):
-    SEL = get_sel()
-    sois = span_of_interest['start']
-    soie = span_of_interest['end']
-    # if only 1 SEL span starts within the bounds of the ifp span or ends within the bounds
-    keeps = []
-    for span in SEL_spans:
-        starter = span[0]
-        ender = span[1]
-        if starter <= soie and starter >=sois:
-            keeps.append(span)
-        elif ender >= sois and ender <= soie:
-            keeps.append(span)
-
-    if len(keeps) == 1:
-        match = keeps[0]
-        return (match[0],match[1])
-    else:
-        return None
-
-def check_if_direct_entry_match(ucid, line_of_interest, span_of_interest):
-    SEL = get_sel()
-    docket_lines = SEL[SEL.ucid ==ucid]
-
-    direct_line_match = docket_lines[docket_lines.docket_index == line_of_interest]
-    # unique scales judges for this exact line
-    dlm = direct_line_match.copy()
-    dlm.drop_duplicates('SCALES_JID', inplace=True)
-    dlm = dlm[~dlm.SCALES_JID.isna()].copy()
-
-    # no direct match, use other logic
-    if len(dlm) == 0:
-        return None
-    elif len(dlm) == 1:
-        SJID = dlm.SCALES_JID.iloc[0]
-        if pd.isnull(SJID):
-                return None
-        else:
-            return SJID
-
-    elif len(dlm)>1:
-        #print("MORE THAN ONE MATCH")
-        SEL_spans = [(i,j) for i, j in zip (direct_line_match.char_span_start.values, direct_line_match.char_span_end.values)]
-
-        single_span_overlap = check_only_one_span_overlap(span_of_interest, SEL_spans)
-        if single_span_overlap:
-            new_dlm = direct_line_match[(direct_line_match.char_span_start == single_span_overlap[0]) &
-                                        (direct_line_match.char_span_end == single_span_overlap[1])]
-
-            SJID = new_dlm.SCALES_JID.iloc[0]
-            if pd.isnull(SJID):
-                    return None
-            else:
-                return SJID
-        else:
-            # sentences splitting logic
-            #{'Mapping': 'Needs Additional Logic Multi-DLM'}
-            return None
-
-def number_judges_ucid(ucid):
-    SEL = get_sel()
-    docket_lines = SEL[SEL.ucid ==ucid]
-
-    actual_judges = docket_lines[~docket_lines.SCALES_JID.isna()]
-    if len(actual_judges)>0:
-        total_docket_judges = len(actual_judges.SCALES_JID.unique())
-        return total_docket_judges
-    else:
-        return 0
-
-def single_judge_ucid_check(ucid):
-    n_judges = number_judges_ucid(ucid)
-
-    return n_judges == 1
-
-def check_if_single_judge(ucid):
-    SEL = get_sel()
-    if single_judge_ucid_check(ucid):
-        docket_lines = SEL[SEL.ucid ==ucid]
-        the_judge = docket_lines[~docket_lines.SCALES_JID.isna()]
-        SJID = the_judge.SCALES_JID.iloc[0]
-        if pd.isnull(SJID):
-            return None
-        else:
-            return SJID
-
-    else:
-        return None
-
-def take_header_judge(ucid):
-    SEL = get_sel()
-    docket_lines = SEL[SEL.ucid==ucid]
-    header = docket_lines[docket_lines.docket_index==-1]
-    header = header[~header.SCALES_JID.isna()].copy()
-    if len(header)>0:
-        ## check for assigned judge first
-        if 'Assigned_Judge' in header.Entity_Extraction_Method.values:
-            this_judge = header[header.Entity_Extraction_Method == 'Assigned_Judge']
-            SJID = this_judge.SCALES_JID.iloc[0]
-            return SJID
-        else:
-            # take the referred_judge
-            this_judge = header[header.Entity_Extraction_Method == 'Referred_Judge']
-            SJID = this_judge.SCALES_JID.iloc[0]
-            return SJID
-    else:
-        return None
-
-def jed_sel_crosswalker(ucid, resolution, statuses, application_line, debug=False):
-
-    if debug:
-        return NAN_NAMES['not_found']
-
-    # LOGIC: no resolution ucids
-    if resolution == None: # no line flagged as the resolution line
-        # IF OUR ENTITY LIST ONLY HAS A SINGLE JUDGE TIED TO THIS CASE, WIN EARLY AND ASSIGN THEM
-        single_judge = check_if_single_judge(ucid)
-        if single_judge:
-            return single_judge
-
-        app_line = [tup for tup in statuses if tup[1] == 'application' and tup[0] == application_line][0]
-        spans_of_interest = app_line[2]
-        direct_line = check_if_direct_entry_match(ucid, application_line, spans_of_interest)
-        if direct_line:
-            return direct_line
-
-        neighbor = check_neighborhood_exact_match(ucid, application_line, 'succeeding_first', statuses)
-        if neighbor:
-            return neighbor
-
-        # find mode of all IFP Lines
-        min_line = min([t[0] for t in statuses])
-        max_line = max([t[0] for t in statuses])
-        modey = check_mode_between_lines(ucid, min_line, max_line)
-        if modey:
-            return modey
-
-        header = take_header_judge(ucid)
-        if header:
-            return header
-
-        return NAN_NAMES['not_found']
-
-    # LOGIC: grant or deny
-    else:
-        # local vars
-        line_of_interest = resolution[0] # index in scales
-        endstate = resolution[1] # resolution label
-        spans_of_interest = resolution[2] # ifp span relative to docket entry
-
-        # LOGIC: resolution is on line 0, need to know if application came with it
-        if line_of_interest == 0:
-            # all line 0 statuses
-            relevant = [stat for stat in statuses if stat[0]==0]
-
-            # if there is an application, then we are good for attribution check
-            if any(stat for stat in relevant if stat[1]=='application'):
-                # good to go there is a pairing
-
-                # IF OUR ENTITY LIST ONLY HAS A SINGLE JUDGE TIED TO THIS CASE, WIN EARLY AND ASSIGN THEM
-                single_judge = check_if_single_judge(ucid)
-                if single_judge:
-                    return single_judge
-
-                direct_line = check_if_direct_entry_match(ucid, line_of_interest, spans_of_interest)
-                if direct_line:
-                    return direct_line
-
-                neighbor = check_neighborhood_exact_match(ucid, line_of_interest,'preceding_first', statuses)
-                if neighbor:
-                    return neighbor
-
-                min_line = min([t[0] for t in statuses])
-                max_line = max([t[0] for t in statuses])
-                modey = check_mode_between_lines(ucid, min_line, max_line)
-                if modey:
-                    return modey
-
-
-                header = take_header_judge(ucid)
-                if header:
-                    return header
-
-                return NAN_NAMES['not_found']
-
-            # no application, void ucid
-            else:
-                # bad, no pairing
-                return IGNORE_CASE
-
-        # LOGIC: RESOLUTION NOT ON LINE 0
-        else:
-            # attribution hierarchy
-            # IF OUR ENTITY LIST ONLY HAS A SINGLE JUDGE TIED TO THIS CASE, WIN EARLY AND ASSIGN THEM
-            single_judge = check_if_single_judge(ucid)
-            if single_judge:
-                return single_judge
-
-            direct_line = check_if_direct_entry_match(ucid, line_of_interest, spans_of_interest)
-            if direct_line:
-                return direct_line
-
-            neighbor = check_neighborhood_exact_match(ucid, line_of_interest, 'preceding_first', statuses)
-            if neighbor:
-                return neighbor
-
-            modey = check_mode_between_lines(ucid, application_line, line_of_interest)
-            if modey:
-                return modey
-
-            header = take_header_judge(ucid)
-            if header:
-                return header
-
-            return NAN_NAMES['not_found']
-
-        return NAN_NAMES['not_found']
-
-
-
-####################################
-### Judge significance functions ###
-####################################
-
-def bootstrap_ttest(df, min_cases=5, exclude_prisoner=False, outliers_prop=0):
-
-    '''
-    Check for statistical significance of variation of judge grant.
-    Compares individual judge to average from all other judges within their district
-
-    Inputs:
-        - df (pd.DataFrame): data frame (expected columns: court, judge_name, case_id, resolution)
-        - min_cases (int): skip judge if they have less that this many cases
-        - outliers_prop(float): proportion (out of 1) of outliers to exclude based on decision_average e.g. 0.1 -> excludes <5% and >95%
-    Output:
-        (pd.DataFrame) results table with ['judge_name','court', 'diff', 'lb', 'ub']
-
-    '''
-    checkdf = df.copy()
-    if outliers_prop > 0:
-        out_lb = outliers_prop/2
-        out_ub = 1 - out_lb
-        checkdf = checkdf[(checkdf.decision_average>=out_lb) & (checkdf.decision_average<=out_ub)].copy()
-    if exclude_prisoner:
-        checkdf = checkdf[checkdf.nature_of_suit_prisoner==0].copy()
-
-    checkdf = checkdf.loc[:, ['court', 'judge_name', 'case_id', 'resolution']].copy()
-    checkdf.columns = ['court',  'judge', 'ucid', 'grant']
-
-    judge_data = []
-    courts = [x for x in checkdf.court.unique() if x!='nmid']
-    for court in courts:
-        #Just subset to keep the naming shorter
-        cdf = checkdf[checkdf.court == court]
-        #Get the judge list
-        judges = cdf.judge.unique()
-        #District differences
-        for j in judges:
-            jdf = cdf[cdf.judge==j]
-            njdf = cdf[cdf.judge!=j]
-
-            if len(jdf)>min_cases and len(njdf)>0:
-                mu_1, var_1 = np.mean(jdf.grant), np.var(jdf.grant)
-                mu_2, var_2 = np.mean(njdf.grant), np.var(njdf.grant)
-                s_1 = np.std(jdf.grant)
-                s_2 = np.std(njdf.grant)
-                Ndf = len(cdf) - 2
-                diff = (mu_1-mu_2)
-
-                #even samples
-                sp_2 =  (((len(jdf)-1)*s_1**2) + ((len(njdf)-1)*s_2**2))/ Ndf
-                se = np.sqrt(s_1**2/len(jdf) + s_2**2/len(njdf))
-                t = diff/se
-                #se = np.sqrt(var_1/len(jdf.grant) + var_2/len(njdf.grant))
-                lb = diff - stats.t.ppf(0.975, Ndf)*se
-                ub = diff + stats.t.ppf(0.975, Ndf)*se
-
-                #Uneven samples
-                se = np.sqrt(s_1**2/len(jdf) + s_2**2/len(njdf))
-                d = diff/se
-                nndf = (se**2)**2/( (s_1**2/len(jdf))**2/(len(jdf)-1) + (s_2**2/len(njdf))**2/(len(njdf)-1) )
-                if np.sign(diff) == -1:
-                    lb = diff + stats.t.ppf(0.975, nndf)*se
-                    ub = diff - stats.t.ppf(0.975, nndf)*se
-                else:
-                    lb = diff - stats.t.ppf(0.975, nndf)*se
-                    ub = diff + stats.t.ppf(0.975, nndf)*se
-
-                judge_data.append([j, court, diff, lb, ub])
-
-    scidf = pd.DataFrame(judge_data, columns = ['judge_name','court', 'diff', 'lb', 'ub'])
-
-    identify_sig = lambda row: int(np.sign(row['lb'])==np.sign(row['ub']) )
-
-    scidf['sig'] = scidf.apply(identify_sig, axis=1)
-    # print(f"Proportion significant: {scidf.sig.sum()/len(scidf)}")
-    return scidf
-
-def create_judge_var_sig_tables(dataset):
-    '''
-    Check for judge variance signifcance with boostrapping.
-    Ouputs two tables (1) 'judge_var_sig.csv' and an aggregated (2) 'judge_var_sig_lookup.csv'
-
-    Inputs:
-        - dataset (pd.DataFrame or str/Path): dataframe formatted for living report
-    '''
-
-    if type(dataset) is not pd.DataFrame:
-        # Read in dataset if argument is a string or path
-        dataset = pd.read_csv(dataset)
-
-    # Run separate bootstrap for excl_prisoner_outliers and not
-    bt1 = bootstrap_ttest(dataset)
-    bt2 = bootstrap_ttest(dataset, exclude_prisoner=True, outliers_prop=0.1)
-
-    bt1['excl_prisoner_outliers'] = False
-    bt2['excl_prisoner_outliers'] = True
-    bt_both = pd.concat([bt1,bt2])
-    bt_both.to_csv(DATAPATH + f'judge_var_sig_{timestamp}.csv', index=False)
-
-    # Aggregate by court to produce a lookup table
-    dfvar = bt_both.groupby(['excl_prisoner_outliers','court']).sig.agg(['sum','count','mean']).reset_index()
-    # Reduce columns and rename
-    dfvar = dfvar[ ['court','excl_prisoner_outliers','sum', 'count','mean'] ]
-    dfvar.columns = ['court','excl_prisoner_outliers','jsum', 'jcount','jmean']
-
-    dfvar = dfvar.sort_values('court').reset_index(drop=True)
-    threshold = 0.05
-    dfvar['isSig'] = dfvar.jmean > threshold
-    dfvar.to_csv(DATAPATH + f'judge_var_sig_lookup_{timestamp}.csv',index=False)
-
-
-
 
 
 #Defaults
@@ -512,20 +85,25 @@ def generate_default_courtdf():
     courtdf_default = pd.read_csv(settings.COURTFILE)
     return courtdf
 
-def generate_default_jdf():
-    jdf_default = pd.read_csv(settings.JUDGEFILE, index_col=0)
-    #Create fullName column
-    if 'FullName' not in jdf_default.columns:
-        print('Building FullName Column')
-        FullName = jdf_default.apply(lambda row: ' '.join([str(x) for x in row[['First Name', 'Middle Name', 'Last Name','Suffix',]] if not pd.isnull(x)]), axis=1)
-        FullName = FullName.apply(lambda row: row.replace('   ', ' '))
-        jdf_default.insert(2, 'FullName', FullName)
-        jdf_default.to_csv(settings.JUDGEFILE)
+def load_fjc_biographical_data():
+    '''
+    Load the FJC biographical data on judges, from settings.JUDGEFILE
 
-    #Convert columns to timestamp
+    Note: creates a FullName column at loadtime,
+    and converts Commision Date and Senior Status Date columns to datetime
+    '''
+    jdf = pd.read_csv(settings.JUDGEFILE, index_col=0)
+
+    #Create fullName column
+    if 'FullName' not in jdf.columns:
+        FullName = jdf.apply(lambda row: ' '.join([str(x) for x in row[['First Name', 'Middle Name', 'Last Name','Suffix',]] if not pd.isnull(x)]), axis=1)
+        FullName = FullName.apply(lambda row: row.replace('   ', ' '))
+        jdf.insert(2, 'FullName', FullName)
+
+    # Convert columns to timestamp
     for i in range(1,7):
         for col in [f"Commission Date ({i})", f"Senior Status Date ({i})"]:
-            jdf_default[col] = pd.to_datetime(jdf_default[col])
+            jdf[col] = pd.to_datetime(jdf[col])
     return jdf
 
 def clean_name_field(name_field):
@@ -783,29 +361,26 @@ def filter_by_court(df, court, date=None):
 
     return df[df.apply(lambda row: _filter_row(row, court_full, date), axis=1)].copy()
 
-def find_district_judge(name, court, date = None, jdf=None, courtdf=None):
+def find_district_judge(name, court, jdf, courtdf, date = None):
     '''
-        Locate a row in the judge_demographics spreadsheet for a given judge
+    Locate a row in the judge_demographics spreadsheet for a given judge
 
-        inputs:
-         name - full name of the judge from the docket
-         court - four char abbreviation of court
+    Inputs
+        - name (str): full name of the judge from the docket
+        - court (str): abbreviation of court
+        - jdf (pd.DataFrame): Judge dataframe (or subset)
+        - courtdf (pd.DataFrame): the court dataframe
+        - date (timestamp): date to filter on
 
-         outputs:
-            bool - match found or not
-            Series - the row from judge df
+    outputs:
+        (bool) match found or not
+        (pd.Series) the row from judge df
     '''
     # TODO remove?
     if type(name) is not str:
         return False, None
     if name.strip() in committee_names:
         return committee_names[name.strip()]
-
-    #Load in the data if it isn't passed
-    if type(courtdf)==type(None):
-        courtdf = generate_default_courtdf()
-    if type(jdf)==type(None):
-        jdf = generate_default_jdf()
 
     # Filter just last name first
     last_name = identify_last_name_clean(name)
@@ -832,17 +407,19 @@ def find_district_judge(name, court, date = None, jdf=None, courtdf=None):
         else:
             return  name_similarity_matcher(name, filter_by_court(jdf, court, date))
 
-def identify_judge_nid(name, court, date=None, jdf=None, fill_name_court=False):
+def identify_judge_nid(name, court, jdf, date=None, fill_name_court=False):
     '''
-        Find a judge's nid
+    Find a judge's nid
 
-        Inputs:
-            name (str): judge's name
-            court (str): court abbreviation
-            date (str/DateTime): the date to check for
-            jdf (DataFrame): judge dataframe or subset to look in
-            fill_name_court (bool): whether to return a faux-id of "{name};;{court}"
-                                    instead of 9999999 for magistrate judges
+    Inputs:
+        name (str): judge's name
+        court (str): court abbreviation
+        jdf (DataFrame): judge dataframe or subset to look in
+        date (str/DateTime): the date to check for
+        fill_name_court (bool): whether to return a faux-id of "{name};;{court}"
+                                instead of 9999999 for magistrate judges
+    Output:
+        (int) judge nid
     '''
     # TODO- CHECK?
     if name.strip() in committee_names:

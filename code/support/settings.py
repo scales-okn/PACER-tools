@@ -40,10 +40,11 @@ MEM_DF = PROJECT_ROOT / 'code' / 'downloader' / 'member_cases.csv'
 FLAGS_DF = DATAPATH / 'annotation' / 'case_flags.csv'
 RECAP_ID_DF = DATAPATH / 'annotation' / 'recap_id2ucid.csv'
 
-DF_SEL = DATAPATH / 'annotation' / 'SEL_04_2021.csv'
-DF_JEL = DATAPATH / 'annotation' / 'JEL_04_2021.csv'
 DIR_SEL = DATAPATH / 'annotation' / 'SEL_DIR'
-JEL_JSONL = DATAPATH / 'annotation' / 'JEL_06_2021.jsonl'
+JEL_JSONL = DATAPATH / 'annotation' / 'JEL_Nov21.jsonl'
+
+BAMAG_JUDGES = CORE_DATA / 'brmag_judges.csv'
+BAMAG_POSITIONS = CORE_DATA / 'brmag_positions.csv'
 
 # Misc
 CTYPES = {'cv':'civil', 'cr':'criminal' }

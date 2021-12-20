@@ -1266,21 +1266,33 @@ def case_link(ucids, subdir='html' , incl_token=False, server_index=-1):
 
     # Iterate over all ucids
     for ucid in ucids:
-        path = ftools.get_expected_path(ucid, subdir=subdir)
+        
+        #Iterate over all possible case updates (will only really apply to htmls)
+        update_ind = 0
+        path = ftools.get_expected_path(ucid, subdir=subdir, update_ind=update_ind)
+        while path.exists():
 
-        if not path.exists():
+            rel_path = path.relative_to(notebook_dir)
+            base_url = f"http://{server['hostname']}:{server['port']}/view/"
+            full_url = base_url + str(rel_path)
+
+            if incl_token:
+                full_url +=  f'?token={token}'
+            
+            # Construct the label
+            label = ucid
+            if update_ind>0:
+                label += f' (update={update_ind})'
+
+            link = f'{label:<50}: <a target="_blank" href="{full_url}">{full_url}</a>'
+            display(HTML(link))
+            
+            update_ind +=1
+            path = ftools.get_expected_path(ucid, subdir=subdir, update_ind=update_ind)
+            
+        if not path.exists() and update_ind==0:
             print(f'{ucid}: No such file exists at {path}')
             continue
-
-        rel_path = path.relative_to(notebook_dir)
-        base_url = f"http://{server['hostname']}:{server['port']}/view/"
-        full_url = base_url + str(rel_path)
-
-        if incl_token:
-            full_url +=  f'?token={token}'
-
-        link = f'{ucid}: <a target="_blank" href="{full_url}">{full_url}</a>'
-        display(HTML(link))
 
 def doc_link(docs, incl_token=False, server_index=-1):
     '''
