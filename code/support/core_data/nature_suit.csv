@@ -1,0 +1,109 @@
+number,name,sub_type,major_type
+110,Insurance,contract,contract
+120,Marine,contract,contract
+130,Miller Act,contract,contract
+140,Negotiable Instrument,contract,contract
+150,Recovery Of Overparyment & Enforcement Of Judgment,contract,contract
+151,Medicare Act,contract,contract
+152,Recovery Of Defaulted Student Loans (Excl. Veterans),contract,contract
+153,Recovery Of Overpayment Of Veteran S Benefits,contract,contract
+160,Stockholders Suits,contract,contract
+190,Other Contract,contract,contract
+195,Contract Product Liability,contract,contract
+196,Franchise,contract,contract
+210,Land Condemnation,real property,real property
+220,Foreclosure,real property,real property
+230,Rent Lease & Ejectment,real property,real property
+240,Torts To Land,real property,real property
+245,Tort Product Liability,real property,real property
+290,All Other Property,real property,real property
+310,Airplane,personal injury,torts
+315,Airplane Product Liability,personal injury,torts
+320,"Assault, Libel, & Slander",personal injury,torts
+330,Federalemployers Liability,personal injury,torts
+340,Marine,personal injury,torts
+345,Marine Product Liability,personal injury,torts
+350,Motor Vehicle,personal injury,torts
+355,Motor Vehicle Product Liability,personal injury,torts
+360,Other Personal Injury,personal injury,torts
+362,Personal Injury- Medical Malpractice,personal injury,torts
+365,Personal Injury- Product Liability,personal injury,torts
+367,Personal Injury - Health Care/Pharmaceutical Personal Injury/Product Liability,personal injury,torts
+368,Asbestos Personal Injury Product Liability,personal injury,torts
+375,False Claims Act,personal injury,torts
+376,376 Qui Tam (31 U.S.C. 3729(A)),personal injury,torts
+370,Other Fraud,personal property,torts
+371,Truth In Lending,personal property,torts
+380,Other Personal Property Damage,personal property,torts
+385,Property Damage Product Liability,personal property,torts
+422,Appeal 28 Usc 158,bankruptcy,bankruptcy
+423,Withdrawal 28 Usc 157,bankruptcy,bankruptcy
+440,Other Civil Rights,civil rights,civil rights
+441,Voting,civil rights,civil rights
+442,Employment,civil rights,civil rights
+443,Housing/Accommodations,civil rights,civil rights
+444,Welfare,civil rights,civil rights
+445,Amer W/Disabilities-Employment,civil rights,civil rights
+446,Amer W/Disabilities - Other,civil rights,civil rights
+448,Education,civil rights,civil rights
+462,Naturalization Application,immigration,immigration
+463,Habeas Corpus - Alien Detainee,immigration,immigration
+465,Other Immigration Actions,immigration,immigration
+510,Motions To Vacate Sentence,prisoner petitions,prisoner petitions
+530,General,habeas corpus,prisoner petitions
+535,Death Penalty,habeas corpus,prisoner petitions
+540,Mandamus & Other,habeas corpus,prisoner petitions
+550,Civil Rights,habeas corpus,prisoner petitions
+555,Prison Condition,habeas corpus,prisoner petitions
+560,Conditions Of Confinement,civil detainee,prisoner petitions
+610,Agriculture,forfeiture/penalty,forfeiture/penalty
+620,Other Food & Drug,forfeiture/penalty,forfeiture/penalty
+625,Drug Related Seizure Of Property 21 Usc 881 630 Liquor Laws,forfeiture/penalty,forfeiture/penalty
+630,Liquor Laws,forfeiture/penalty,forfeiture/penalty
+640,Rr & Truck,forfeiture/penalty,forfeiture/penalty
+650,Airline Regulations,forfeiture/penalty,forfeiture/penalty
+660,Occupational Safety/Health,forfeiture/penalty,forfeiture/penalty
+690,Other,forfeiture/penalty,forfeiture/penalty
+710,Fair Labor Standards Act,labor,labor
+720,Labor/Management Relations,labor,labor
+730,Labor/Management Reporting & Disclosure Act,labor,labor
+740,Railway Labor Act,labor,labor
+751,Family And Medical Leave Act,labor,labor
+790,Other Labor Litigation,labor,labor
+791,Employee Retirement Income Security Act,labor,labor
+820,Copyrights,property rights,property rights
+830,Patent,property rights,property rights
+835,Patent Abbreviated New Drug Application (Anda),property rights,property rights
+840,Trademark,property rights,property rights
+880,Defend Trade Secrets Act Of 2016 (Dtsa),property rights,property rights
+861,Hia (1395Ff),social security,social security
+862,Black Lung (923),social security,social security
+863,Diwc/Diww (405(G)),social security,social security
+864,Ssid Title Xvi,social security,social security
+865,Rsi (405(G)),social security,social security
+870,Taxes (U.S. Plaintiff Or Defendant),federal tax suits,federal tax suits
+871,Irs-Third Party 26 Usc 7609,federal tax suits,federal tax suits
+400,State Reapportionment,other statutes,other statutes
+410,Antitrust,other statutes,other statutes
+430,Banks And Banking,other statutes,other statutes
+450,Commerce,other statutes,other statutes
+460,Deportation,other statutes,other statutes
+470,Racketeer Influenced And Corrupt Organizations,other statutes,other statutes
+480,Consumer Credit,other statutes,other statutes
+485,Telephone Consumer Protection Act (Tcpa),other statutes,other statutes
+490,Cable/Sat Tv,other statutes,other statutes
+810,Selective Service,other statutes,other statutes
+850,Securities/Commodities/Exchange,other statutes,other statutes
+875,Customer Challenge 12 Usc 3410,other statutes,other statutes
+890,Other Statutory Actions,other statutes,other statutes
+891,Agricultural Acts,other statutes,other statutes
+892,Economic Stabilization Act,other statutes,other statutes
+893,Environmental Matters,other statutes,other statutes
+894,Energy Allocation Act,other statutes,other statutes
+895,Freedom Of Information Act,other statutes,other statutes
+896,Arbitration,other statutes,other statutes
+899,Administrative Procedure Act/Review Or Appeal Of Agency Decision,other statutes,other statutes
+900,Appeal Of Fee Determination Under Equal Access To Justice Act,other statutes,other statutes
+950,Constitutionality Of State Statutes,other statutes,other statutes
+990,Other,other statutes,other statutes
+999,Miscellaneous Cases,other statutes,other statutes
