@@ -34,6 +34,7 @@ ROLE_MAPPINGS = DATAPATH / 'annotation' / 'role_mappings.json'
 COURTFILE = CORE_DATA / 'district_courts.csv'
 JUDGEFILE = CORE_DATA / 'judge_demographics.csv'
 STATEY2CODE = CORE_DATA / 'statey2code.json'
+DISTRICT_COURTS_94 = CORE_DATA / 'district_courts_94.csv'
 NATURE_SUIT = CORE_DATA / 'nature_suit.csv'
 EXCLUDE_CASES = DATAPATH / 'exclude.csv'
 MEM_DF = PROJECT_ROOT / 'code' / 'downloader' / 'member_cases.csv'
@@ -42,6 +43,10 @@ RECAP_ID_DF = DATAPATH / 'annotation' / 'recap_id2ucid.csv'
 
 DIR_SEL = DATAPATH / 'annotation' / 'SEL_DIR'
 JEL_JSONL = DATAPATH / 'annotation' / 'JEL_Nov21.jsonl'
+
+# Counsel Disambiguations
+COUNSEL_DIS_DIR = DATAPATH / 'annotation' / 'Counsel_Disambiguations'
+COUNSEL_DIS_CLUSTS = DATAPATH / 'annotation' / 'Counsel_Clusters.jsonl'
 
 BAMAG_JUDGES = CORE_DATA / 'brmag_judges.csv'
 BAMAG_POSITIONS = CORE_DATA / 'brmag_positions.csv'

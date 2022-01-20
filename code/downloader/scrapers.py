@@ -366,7 +366,8 @@ class QueryScraper(CoreScraper):
                     # Download html
                     outpath = self.dir.queries/f'{self.prefix}__{i}.html'
                     # Create parent directory incase prefix includes a subdirectory e.g. /{court}/queries/projectA/query__1.html
-                    outpath.parent.mkdir(exist_ok=True, parents=True)
+                    outpath.parent.mkdir(exist_ok=True, parents=True, mode=0o775)
+
 
                     time.sleep(PAUSE['micro'])
                     download_url = self.browser.current_url
@@ -606,9 +607,8 @@ class DocketScraper(CoreScraper):
             time.sleep(PAUSE['micro'])
             download_url = self.browser.current_url
 
-            #TODO: add this to other scrapers
             # Make sure parent directory exists, which will be the year-part
-            outpath.parent.mkdir(exist_ok=True, )
+            outpath.parent.mkdir(exist_ok=True, mode=0o775)
             with open(outpath, "w+") as wfile:
                 # Add the stamp to the bottom of the url as it is written
                 wfile.write(self.browser.page_source + self.stamp(download_url, pacer_id=pacer_id))
@@ -647,112 +647,7 @@ def get_member_cases(court_dir, file=settings.MEM_DF):
     ''' Get the list cases that have previously been seen listed as member cases'''
     return pd.read_csv(Path(file)).query("court==@court_dir.court")['case_no'].tolist()
 
-def parse_query_report(html_path, full_dfs, court, case_type):
-    ''' Parse a single query report .html file'''
 
-    dfset = pd.read_html(str(html_path))
-    # Extract first three columns (may be more depending on search results)
-    df = dfset[0].iloc[:, :3].copy()
-    df.columns = ['case_id', 'name', 'details']
-    df.dropna(inplace=True)
-    df['case_type'] = df.case_id.apply(lambda x: x.split('-')[1])
-    df['clean_id'] = df.case_id.apply(ftools.clean_case_id)
-    df['court'] = df.case_id.apply(lambda x: court)
-    df['dates_filed'] = df.details.apply(stools.extract_query_filedate)
-
-    # Case switch if case_type optional argument has been provided
-    if case_type:
-        df = df[df.case_type==case_type]
-    else:
-        df = df[df.case_type.isin(['cr', 'cv'])]
-
-
-    full_dfs.append(df)
-    gdf = df.loc[:, ['case_id', 'case_type']].groupby('case_type').agg('count').reset_index()
-    gdf.columns = ['case_type', str(html_path)]
-    return gdf
-
-
-def parse_docket_input(query_results, docket_input, case_type, court):
-    '''
-    Figure out the input for the docket module
-    Inputs:
-        - query_results (list): List of query results (paths to htmls) from query module, will be [] if query scraper didn't run
-        - docket_input (Path): the docket input argument
-        - case_type (str)
-        - court (str): court abbreviation
-        - allow_def_stub
-     Outputs:
-        - input_data (list of dicts): data to be fed into docket scraper
-            [{'case_no': 'caseA' 'latest_date': '...'},...] ('latest_date' may or may not be present)
-    '''
-    if len(query_results)==0 and docket_input==None:
-        raise ValueError('Please provide a docket_input')
-
-    # Check all html scenarios first
-    is_html = False
-
-    # If there are results from query scraper, use those
-    if len(query_results):
-        is_html = True
-        query_htmls = query_results
-
-    elif not docket_input.exists():
-        logging.info(f'docket_input does not exist ({docket_input})')
-        return []
-    # If the input is a directory, get all query htmls in directory
-    elif docket_input.is_dir():
-        is_html=True
-        query_htmls = list(docket_input.glob('*.html'))
-
-    # If single html query, then singleton list for query_htmls
-    elif docket_input.suffix == '.html':
-        is_html = True
-        query_htmls = [ docket_input ]
-
-    # If any of the html scenarios reached, build case list from query_htmls
-    if is_html:
-        case_nos = build_case_list_from_queries(query_htmls, case_type, court)
-        input_data = [{'case_no': cn} for cn in case_nos]
-
-    # CSV case
-    else:
-        if docket_input.suffix !='.csv':
-            raise ValueError('Cannot interpret docket_input')
-        df = pd.read_csv(docket_input, dtype={'def_no':str})
-
-        # Parse ucid and create court and case_no columns
-        df = df.assign(**dtools.parse_ucid(df.ucid))
-        # Restrict to just ucids in this court and drop duplicates
-        df.query("court==@court", inplace=True)
-        df.drop_duplicates('case_no', inplace=True)
-
-        # Fill na for def_no before to_dict
-        if 'def_no' in df.columns:
-            df['def_no'].fillna('', inplace=True)
-
-        # Keep just case_no and get lastest_date if it's there
-        keepcols = [col for col in ('case_no', 'latest_date', 'def_no') if col in df.columns]
-
-
-        input_data = df[keepcols].to_dict('records')
-
-    return input_data
-
-def build_case_list_from_queries(query_htmls, case_type, court):
-    ''' Get the list of cases to scrape, filter out recap cases'''
-
-    full_dfs=[]
-    result_set = []
-    for html_path in query_htmls:
-        gdf = parse_query_report(html_path, full_dfs, court, case_type)
-        result_set.append(gdf)
-
-    # Compile cases to a single series, clean case ids and remove duplicates (defendant cases)
-    cases = pd.concat([df['case_id'] for df in full_dfs]).map(ftools.clean_case_id).drop_duplicates()
-    #
-    # cases = [x for x in map(ftools.clean_case_id, list(cases)) if x]
-    return cases
 
 def check_exists(subdir, court=None, case_no=None, ucid=None, def_no=None, pacer_path=settings.PACER_PATH):
     '''
@@ -781,28 +676,28 @@ def check_exists(subdir, court=None, case_no=None, ucid=None, def_no=None, pacer
 
 
 # Note: deprecating because it fails in directories with many files when run in docker (the `ls` command gives an OS error)
-def get_downloaded_cases(court_dir, summaries=False):
-    '''
-    Create a df of all dockets in this court_dir html folder with filepath, ucid columns
-    Inputs:
-        - court_dir(PacerCourtDir)
-        - summaries (bool): if True check downloaded summaries, else by default check for dockets
-    Output:
-        DataFrame (with cols: filepath, case_no, ucid)
-    '''
-    sub_dir = court_dir.summaries if summaries else court_dir.html
-    all_cases = list(sub_dir.glob('*.html'))
+# def get_downloaded_cases(court_dir, summaries=False):
+#     '''
+#     Create a df of all dockets in this court_dir html folder with filepath, ucid columns
+#     Inputs:
+#         - court_dir(PacerCourtDir)
+#         - summaries (bool): if True check downloaded summaries, else by default check for dockets
+#     Output:
+#         DataFrame (with cols: filepath, case_no, ucid)
+#     '''
+#     sub_dir = court_dir.summaries if summaries else court_dir.html
+#     all_cases = list(sub_dir.glob('*.html'))
 
-    data = [(str(p), ftools.clean_case_id(p.stem) ) for p in all_cases]
-    df = pd.DataFrame(data, columns=['fpath', 'case_no'])
+#     data = [(str(p), ftools.clean_case_id(p.stem) ) for p in all_cases]
+#     df = pd.DataFrame(data, columns=['fpath', 'case_no'])
 
-    # Remove dockets that are docket update html files
-    re_up = r'.*_\d{1,3}.html$'
-    df = df[~df.fpath.str.match(re_up)].copy()
+#     # Remove dockets that are docket update html files
+#     re_up = r'.*_\d{1,3}.html$'
+#     df = df[~df.fpath.str.match(re_up)].copy()
 
-    df['ucid'] = dtools.ucid(court_dir.court, df.case_no)
+#     df['ucid'] = dtools.ucid(court_dir.court, df.case_no)
 
-    return df[['ucid', 'fpath']]
+#     return df[['ucid', 'fpath']]
 
 def get_excluded_cases(exclusions_path, court):
     ''' Get the excluded cases'''
@@ -1005,6 +900,7 @@ class MemberScraper(CoreScraper):
             outpath = ftools.get_expected_path(case['ucid'], subdir='members', pacer_path=self.dir.root.parent, def_no=case.get('def_no'))
 
             download_url = self.browser.current_url
+            outpath.parent.mkdir(exist_ok=True, mode=0o775)
             with open(outpath, "w+") as wfile:
                 # Add the stamp to the bottom of the url as it is written
                 stamp = self.stamp_json(download_url=download_url, pacer_id=pacer_id)
@@ -1039,11 +935,11 @@ class DocumentScraper(CoreScraper):
         return [ftools.parse_document_fname(x.name)['doc_id'] for x in self.dir.docs.glob('*.pdf')]
 
     @run_in_executor
-    def pull_all_docs(self, docket):
+    def pull_docs(self, docket):
         '''
-        Pull all documents from a docket report for a single case
+        Pull documents on a given case.
         Inputs:
-            - docket (dict): a dict with a fpath to a single .html file (and potentially a 'doc_no' key)
+            - docket (dict): a dict with an 'fpath' key to a single .html file, and a 'doc_no' key)
         '''
         if self.browser is None:
             login_success = self.launch_browser()
@@ -1051,10 +947,12 @@ class DocumentScraper(CoreScraper):
                 self.close_browser()
                 raise ValueError('Cannot log in to PACER')
 
-        fpath = Path(docket['fpath'])
-        # Get ucid
+
+        ucid = docket['ucid']
+        fpath = ftools.get_expected_path(ucid, subdir='html', pacer_path=self.dir.root.parent,)
         case_no = ftools.clean_case_id(fpath.stem)
-        ucid = dtools.ucid(self.court, case_no)
+
+
 
         # Get all the document links for this file
         soup = BeautifulSoup( open(fpath).read(), "html.parser")
@@ -1273,26 +1171,25 @@ def generate_dockets_list(document_input, core_args, skip_seen=True, all_docs=Fa
     Ouptut:
         a list of dicts with filepath and doc_no keys
     '''
-    # Create a df from the list of all dockets in this court_dir html folder
-    df = get_downloaded_cases(core_args['court_dir'])
-
 
     # Get the subset of ucids of interest
     cases_file = Path(document_input).resolve()
     if not cases_file.exists():
         raise ValueError(f'File at {cases_file} does not exist')
 
-    df_input = pd.read_csv(cases_file)
-    keepcols = [x for x in ['ucid', 'doc_no'] if x in df_input.columns]
+    df = pd.read_csv(cases_file)
+    keepcols = [x for x in ['ucid', 'doc_no'] if x in df.columns]
 
     # All docs check
-    if ('doc_no' not in df_input.columns) and (not all_docs):
+    if ('doc_no' not in df.columns) and (not all_docs):
         logging.info(f'\nALL DOCS: No `doc_no` column found in document-input. Use --all-docs flag if you want all docs per case ($$$)\n')
         return []
 
-    df = df.merge(df_input[keepcols], how='inner', on='ucid')
+    # Filter out cases we don't have htmls for
+    df['exists'] = df.ucid.apply(lambda x: ftools.get_expected_path(ucid=x, subdir='html',pacer_path=core_args['court_dir'].root.parent).exists())
+    df = df[df.exists].copy()
 
-    # Filter out dockets that have *any* docs downloaded if skip_seen or
+    # Filter out dockets that have *any* docs downloaded if skip_seen
     if skip_seen and not ('doc_no' in df.columns):
         # Get list of ucids that have previously had docs downloaded
         document_paths = list(core_args['court_dir'].docs.glob('*.pdf'))
@@ -1301,7 +1198,7 @@ def generate_dockets_list(document_input, core_args, skip_seen=True, all_docs=Fa
         # Limit df to ucids that haven't been seen
         df = df[~df.ucid.isin(seen_ucids)].copy()
 
-    keepcols = [x for x in ['fpath', 'doc_no'] if x in df.columns]
+    keepcols = [x for x in ['ucid', 'doc_no'] if x in df.columns]
     return df[keepcols].to_dict('records')
 
 
@@ -1386,7 +1283,7 @@ async def seq_docket(core_args, query_results, docket_input, docket_update, show
     logging.info(f"\n######\n## Docket Scraper Sequence [{core_args['court']}]\n######\n")
 
     # Handle all of parsing for varied docket_input possibilites
-    input_data = parse_docket_input(query_results, docket_input, core_args['case_type'], core_args['court'])
+    input_data = stools.parse_docket_input(query_results, docket_input, core_args['case_type'], core_args['court'])
 
     if not len(input_data):
         logging.info('No input data, ending session')
@@ -1520,7 +1417,7 @@ async def seq_summary(core_args, summary_input):
     logging.info("\n######\n## Summary Scraper Sequence\n######\n")
 
     # Handle all of parsing for varied docket_input possibilites
-    input_data = parse_docket_input(
+    input_data = stools.parse_docket_input(
         query_results=[],
         docket_input=summary_input,
         case_type=core_args['case_type'],
@@ -1643,10 +1540,9 @@ async def seq_document(core_args, new_dockets, document_input, document_att, ski
             # Pop a case off the dockets list
 
             docket = dockets.pop(0)
-            file = Path(docket['fpath'])
-            logging.info(f"{DocS} taking docket {file.name}")
+            logging.info(f"{DocS} taking case {docket['ucid']}")
             try:
-                await DocS.pull_all_docs(docket)
+                await DocS.pull_docs(docket)
             except:
                 logging.info(f'{DocS} Error downloading documents from {file.name}')
 
@@ -1654,7 +1550,6 @@ async def seq_document(core_args, new_dockets, document_input, document_att, ski
         DocS.close_browser()
 
     logging.info(f"\n######\n## Document Scraper Sequence [{core_args['court']}]\n######\n")
-
 
     # Handle separate download folders for browser instances
     core_args['court_dir'].make_temp_subdirs(core_args['n_workers'])
@@ -1801,9 +1696,11 @@ def main(inpath, mode, n_workers, court, case_type, auth_path, override_time, ru
     }
 
     # Create the run schedule of which modules to run
-    run_module = {k : bool(mode in ['all', k]) for k in MODULES}
-    if mode=='all':
-        logging.info('\nMODE:ALL - All three scrapers will run in sequence (query,docket,document)')
+    # run_module = {k : bool(mode in ['all', k]) for k in MODULES}
+    # if mode=='all':
+    #     logging.info('\nMODE:ALL - All three scrapers will run in sequence (query,docket,document)')
+
+    run_module = {k : (k==mode) for k in MODULES}
 
     # Query Scraper run sequence
     if run_module['query']:
@@ -1825,7 +1722,11 @@ def main(inpath, mode, n_workers, court, case_type, auth_path, override_time, ru
 
     # Docket Scraper run sequence
     if run_module['docket']:
-        docket_input = Path(docket_input).resolve() if docket_input else None
+        if not docket_input:
+            raise ValueError('Must supply a --document-input for the document scraper')
+        else:
+            docket_input = Path(docket_input).resolve()
+
         docket_results = asyncio.run(
             seq_docket(
                 core_args,

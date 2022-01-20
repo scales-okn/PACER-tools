@@ -510,3 +510,133 @@ def build_wanted_doc_nos(doc_no):
             wanted_doc_nos[line_no].append(att_no)
 
     return wanted_doc_nos
+
+def parse_docket_input(query_results, docket_input, case_type, court):
+    '''
+    Figure out the input for the docket module
+    Inputs:
+        - query_results (list): List of query results (paths to htmls) from query module, will be [] if query scraper didn't run
+        - docket_input (Path): the docket input argument
+        - case_type (str)
+        - court (str): court abbreviation
+        - allow_def_stub
+     Outputs:
+        - input_data (list of dicts): data to be fed into docket scraper
+            [{'case_no': 'caseA' 'latest_date': '...'},...] ('latest_date' may or may not be present)
+    '''
+    if len(query_results)==0 and docket_input==None:
+        raise ValueError('Please provide a docket_input')
+
+    # Check all html scenarios first
+    is_html = False
+
+    # If there are results from query scraper, use those
+    if len(query_results):
+        is_html = True
+        query_htmls = query_results
+
+    elif not docket_input.exists():
+        logging.info(f'docket_input does not exist ({docket_input})')
+        return []
+    # If the input is a directory, get all query htmls in directory
+    elif docket_input.is_dir():
+        is_html=True
+        query_htmls = list(docket_input.glob('*.html'))
+
+    # If single html query, then singleton list for query_htmls
+    elif docket_input.suffix == '.html':
+        is_html = True
+        query_htmls = [ docket_input ]
+
+    # If any of the html scenarios reached, build case list from query_htmls
+    if is_html:
+        case_nos = build_case_list_from_queries(query_htmls, case_type, court)
+        input_data = [{'case_no': cn} for cn in case_nos]
+
+    # CSV case
+    else:
+        if docket_input.suffix !='.csv':
+            raise ValueError('Cannot interpret docket_input')
+        df = pd.read_csv(docket_input, dtype={'def_no':str})
+
+        # Parse ucid and create court and case_no columns
+        df = df.assign(**dtools.parse_ucid(df.ucid))
+        # Restrict to just ucids in this court and drop duplicates
+        df.query("court==@court", inplace=True)
+        df.drop_duplicates('case_no', inplace=True)
+
+        # Fill na for def_no before to_dict
+        if 'def_no' in df.columns:
+            df['def_no'].fillna('', inplace=True)
+
+        # Keep just case_no and get lastest_date if it's there
+        keepcols = [col for col in ('case_no', 'latest_date', 'def_no') if col in df.columns]
+
+
+        input_data = df[keepcols].to_dict('records')
+
+    return input_data
+
+def build_case_list_from_queries(query_htmls, case_type, court):
+    ''' Get the list of cases to scrape, filter out recap cases'''
+
+    full_dfs=[]
+    result_set = []
+    for html_path in query_htmls:
+        gdf = parse_query_report(html_path, full_dfs, court, case_type)
+        result_set.append(gdf)
+
+    # Compile cases to a single series, clean case ids and remove duplicates (defendant cases)
+    cases = pd.concat([df['case_id'] for df in full_dfs]).map(ftools.clean_case_id).drop_duplicates()
+    #
+    # cases = [x for x in map(ftools.clean_case_id, list(cases)) if x]
+    return cases
+
+
+def compile_query_list(query_dir, court, case_type=None, output=True):
+    ''' 
+    Take a directory of query htmls and create an index of unique UCIDs 
+    
+    Input:
+        - query_dir (str or Path): path to the directory that holds the queries
+            i.e. a subdirectory like pacer/court/queries/something
+        - court (str): court abbreviation
+        - case_type (str or None): passed through to scrapers.parse_query_report
+        - output (bool): if true, ouputs ucids to {query_dir}/index.csv
+    Output:
+        (pd.Series) a column of unique ucids from query htmls in query_dir
+    '''
+    casenos = parse_docket_input([], query_dir, case_type=case_type, court=court)
+    df = pd.DataFrame(casenos)
+    df['ucid'] = dtools.ucid(court, df['case_no'])
+    df.drop_duplicates(inplace=True)
+    
+    if output:    
+        df.ucid.to_csv(query_dir/'index.csv', index=False)
+    
+    return df.ucid
+
+def parse_query_report(html_path, full_dfs, court, case_type):
+    ''' Parse a single query report .html file'''
+
+    dfset = pd.read_html(str(html_path))
+    # Extract first three columns (may be more depending on search results)
+    df = dfset[0].iloc[:, :3].copy()
+    df.columns = ['case_id', 'name', 'details']
+    df.dropna(inplace=True)
+    df['case_type'] = df.case_id.apply(lambda x: x.split('-')[1])
+    df['clean_id'] = df.case_id.apply(ftools.clean_case_id)
+    df['court'] = df.case_id.apply(lambda x: court)
+    df['dates_filed'] = df.details.apply(extract_query_filedate)
+
+    # Case switch if case_type optional argument has been provided
+    if case_type:
+        df = df[df.case_type==case_type]
+    else:
+        df = df[df.case_type.isin(['cr', 'cv'])]
+
+
+    full_dfs.append(df)
+    gdf = df.loc[:, ['case_id', 'case_type']].groupby('case_type').agg('count').reset_index()
+    gdf.columns = ['case_type', str(html_path)]
+    return gdf

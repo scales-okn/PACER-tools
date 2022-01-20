@@ -10,6 +10,7 @@ from support import settings
 
 CARDINALS = ['northern', 'southern', 'eastern', 'western', 'central', 'middle']
 STATEY2CODE = json.load(open(settings.STATEY2CODE))
+COURTS_94 = [x.strip() for x in open(settings.DISTRICT_COURTS_94).readlines()]
 
 re_state_codes = '|'.join(STATEY2CODE.values())
 re_card = '|'.join(x[0].lower() for x in CARDINALS)

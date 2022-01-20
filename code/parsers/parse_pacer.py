@@ -919,9 +919,7 @@ def case_runner(case, output_dir, court, debug, force_rerun, count, member_df, l
     case_fname = Path(case['docket_paths'][0]).stem
 
     pacer_dir = Path(output_dir).resolve().parent.parent
-    print(pacer_dir)
     outname = ftools.get_expected_path(ucid=case['ucid'], pacer_path=pacer_dir)
-    print(outname)
     # outname = Path(output_dir) / f"{case_fname}.json"
     if force_rerun or not outname.exists():
         case_data = process_html_file(case, member_df, court = court)

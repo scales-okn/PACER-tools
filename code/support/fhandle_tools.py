@@ -605,6 +605,17 @@ def build_sel_filename_from_ucid(ucid):
 
     return fname
 
+def build_counsel_filename_from_ucid(ucid):
+    year = ucid.split(";;")[1].split(":")[1][0:2]
+    # court is the first sub-directory within the SEL_dor
+    court = ucid.split(';;')[0]
+    # replace the colons and semi-colons with dashes
+    fbase = ucid.replace(';;','-').replace(':','-') +'.jsonl'
+    fname = settings.COUNSEL_DIS_DIR / court / year / fbase
+
+    return fname
+
+
 def get_doc_path(doc_id):
     '''
     Get path for a single document, if it exists
