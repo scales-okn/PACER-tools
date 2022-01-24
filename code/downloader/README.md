@@ -1,9 +1,4 @@
 
-
-
-
-
-
 # Description
 A collection of web scrapers to download data from Pacer.gov.
 The `scraper.py` script contains five scraper modules:
@@ -192,10 +187,7 @@ A relative path to a csv that has at least one of the following columns: *pacer_
 *Document Scraper*
 
  - `--document-input TEXT`
-A relative path that is the Document Scraper module: a csv file that contains a column of UCIDs. These will be the cases that the Document Scraper will run on. If none given, behavior defaults to the following depending on which mode the scraper is running in:
-
-	 - `document` - documents will be downloaded for all cases whose dockets are in the */html* subdirectory for the given court
-	 - `all` - documents will be downloaded for all new dockets downloaded in the previous step of the scraper (the Docket Scraper)
+A relative path that is the Document Scraper module: a csv file that contains a *ucid* column. These will be the cases that the Document Scraper will run on. If a *doc_no* column is provided, then the specific cases specified will be downloaded, see [Downloading specific documents](#downloading-specific-documents) below. Otherwise an error will appear warning the user to use the --document-all-docs option, if they want to download all documents for a case. See below.
 
 - `--document-all-docs`
 This will force the scraper to download **all** documents for each of the cases supplied in *document-input*. Warning: this can be very expensive!

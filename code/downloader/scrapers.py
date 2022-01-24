@@ -952,8 +952,6 @@ class DocumentScraper(CoreScraper):
         fpath = ftools.get_expected_path(ucid, subdir='html', pacer_path=self.dir.root.parent,)
         case_no = ftools.clean_case_id(fpath.stem)
 
-
-
         # Get all the document links for this file
         soup = BeautifulSoup( open(fpath).read(), "html.parser")
         docket_table = soup.select('table')[-2]
@@ -1184,6 +1182,10 @@ def generate_dockets_list(document_input, core_args, skip_seen=True, all_docs=Fa
     if ('doc_no' not in df.columns) and (not all_docs):
         logging.info(f'\nALL DOCS: No `doc_no` column found in document-input. Use --all-docs flag if you want all docs per case ($$$)\n')
         return []
+
+    # If there's a doc_no column, remove any rows where the doc_no column is empty (force user to use --document-all-docs mode)
+    if 'doc_no' in df.columns:
+        df = df[df.doc_no.notna()].copy()
 
     # Filter out cases we don't have htmls for
     df['exists'] = df.ucid.apply(lambda x: ftools.get_expected_path(ucid=x, subdir='html',pacer_path=core_args['court_dir'].root.parent).exists())
