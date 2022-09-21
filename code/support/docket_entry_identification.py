@@ -435,6 +435,7 @@ def nos_matcher(nos, short_hand=False):
         code = nos.split()[0].rstrip(':').lower()
 
     if code.isdigit():
+        code = int(code) # not sure why this cast newly became necessary (new nos file?), but it seems to do the trick!
         result = df_nos.query('number == @code')
         if len(result) == 1:
             win_row = result.iloc[0].to_dict()

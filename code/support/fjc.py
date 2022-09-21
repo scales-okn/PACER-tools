@@ -152,9 +152,10 @@ def load_idb_csv(fpath, case_type, nrows=None, all_cols=False, cols=[]):
             df.loc[idx_na, date_col] = None
 
     # Make ucid and weak_ucid columns and insert at the front
-    ucid, ucid_weak = make_ucid_and_weak(df.docket, df.office, df.district, case_type)
-    df.insert(0, 'ucid', ucid)
-    df.insert(1, 'ucid_weak', ucid_weak)
+    if 'ucid' not in df.columns:
+        ucid, ucid_weak = make_ucid_and_weak(df.docket, df.office, df.district, case_type)
+        df.insert(0, 'ucid', ucid)
+        df.insert(1, 'ucid_weak', ucid_weak)
 
     return df
 
@@ -329,7 +330,7 @@ def split_txt(old_file, out_dir, case_type, year_lb=0, nrows=None, year_var='DOC
     for v in session.values():
         v['file'].close()
 
-def idb_merge(idb_data_file, case_type, preloaded_idb_data_file=None, dframe=None):
+def idb_merge(idb_data_file, case_type, preloaded_idb_data_file=None, dframe=None, cols='bare_min'):
     '''
     Merge dataframe of cases with idb data
 
@@ -338,6 +339,7 @@ def idb_merge(idb_data_file, case_type, preloaded_idb_data_file=None, dframe=Non
         - case_type (str): the case type ('cv' or 'cr') of the cases in the idb file provided
         - preloaded_idb_data_file (DataFrame): specify a preloaded IDB dataframe, e.g. if the consumer has already called load_idb_csv
         - dframe (DataFrame): specify table of case files, instead of using all of unique files table
+        - cols (str, either 'bare_min' or 'all'): the set of IDB columns to output in the merged table
     Outputs
         - final (DataFrame): the merged table
         - match_rate (float): the no. of original casefiles matched against idb
@@ -358,7 +360,8 @@ def idb_merge(idb_data_file, case_type, preloaded_idb_data_file=None, dframe=Non
         df_idb = preloaded_idb_data_file
     else:
         print(f'Loading idb file: {idb_data_file}...')
-        df_idb = load_idb_csv(idb_data_file, case_type=case_type, cols=BARE_MIN_COLS)
+        df_idb = load_idb_csv(idb_data_file, case_type=case_type,
+            all_cols = False if cols=='bare_min' else True, cols=BARE_MIN_COLS if cols=='bare_min' else None)
     df_idb.sort_values(['ucid', 'filedate'], inplace=True)
     df_idb.drop_duplicates('ucid', keep='first', inplace=True)
 
@@ -366,16 +369,18 @@ def idb_merge(idb_data_file, case_type, preloaded_idb_data_file=None, dframe=Non
     print(f'STAGE 1: matching on ucid...')
     matched_mask = dff.ucid.isin(df_idb.ucid)
     matched_ucids = dff.ucid[matched_mask]
-    keepcols = ['fpath', 'case_type', 'filing_date', 'terminating_date', 'source',
-                *[x.lower() for x in BARE_MIN_COLS]]
-                 # *[x.lower() for x in get_recap_idb_cols(case_type)] ]
-    if 'nos_subtype' in dff.columns:
-        keepcols.append('nos_subtype')
+    if cols == 'bare_min':
+        keepcols = ['fpath', 'case_type', 'filing_date', 'terminating_date', 'source',
+                    *[x.lower() for x in BARE_MIN_COLS]]
+                     # *[x.lower() for x in get_recap_idb_cols(case_type)] ]
+        if 'nos_subtype' in dff.columns:
+            keepcols.append('nos_subtype')
 
     # Make table of data merged on ucid
     print(f'STAGE 1: merging...')
-    merged_ucid = dff[matched_mask].merge(df_idb, how='inner', left_on='ucid', right_on='ucid')\
-        .set_index('ucid_copy')[keepcols]
+    merged_ucid = dff[matched_mask].merge(df_idb, how='inner', left_on='ucid', right_on='ucid').set_index('ucid_copy')
+    if cols == 'bare_min':
+        merged_ucid = merged_ucid[keepcols]
     print(f'STAGE 1: {{matched:{sum(matched_mask):,}, unmatched:{sum(~matched_mask):,} }}')
 
     # Reduce dff to unmatched
@@ -390,8 +395,9 @@ def idb_merge(idb_data_file, case_type, preloaded_idb_data_file=None, dframe=Non
     # Stage 2 (matching on ucid_weak and filing date)
     print(f'STAGE 2: merging...')
     merged_weak = dff.merge(df_idb, how="inner", left_on=['ucid_weak','filing_date'],
-                             right_on=['ucid_weak', 'filedate'])\
-                             .set_index('ucid_copy')[keepcols]
+                             right_on=['ucid_weak', 'filedate']).set_index('ucid_copy')
+    if cols == 'bare_min':
+        merged_ucid = merged_ucid[keepcols]
     matched_stage2 = merged_weak.shape[0]
     print(f"STAGE 2 {{matched:{matched_stage2:,}, unmatched:{sum(~matched_mask) -matched_stage2 :,} }}")
 

@@ -511,7 +511,7 @@ def build_wanted_doc_nos(doc_no):
 
     return wanted_doc_nos
 
-def parse_docket_input(query_results, docket_input, case_type, court):
+def parse_docket_input(query_results, docket_input, case_type, court, logging=None):
     '''
     Figure out the input for the docket module
     Inputs:
@@ -519,11 +519,12 @@ def parse_docket_input(query_results, docket_input, case_type, court):
         - docket_input (Path): the docket input argument
         - case_type (str)
         - court (str): court abbreviation
-        - allow_def_stub
+        - logging: logging instance
      Outputs:
         - input_data (list of dicts): data to be fed into docket scraper
             [{'case_no': 'caseA' 'latest_date': '...'},...] ('latest_date' may or may not be present)
     '''
+
     if len(query_results)==0 and docket_input==None:
         raise ValueError('Please provide a docket_input')
 
@@ -536,12 +537,18 @@ def parse_docket_input(query_results, docket_input, case_type, court):
         query_htmls = query_results
 
     elif not docket_input.exists():
-        logging.info(f'docket_input does not exist ({docket_input})')
+        if logging is not None:
+            logging.info(f'docket_input does not exist ({docket_input})')
+        else:
+            print(f'docket_input does not exist ({docket_input})')
         return []
     # If the input is a directory, get all query htmls in directory
     elif docket_input.is_dir():
         is_html=True
         query_htmls = list(docket_input.glob('*.html'))
+
+        if not len(query_htmls):
+            return []
 
     # If single html query, then singleton list for query_htmls
     elif docket_input.suffix == '.html':
@@ -587,33 +594,42 @@ def build_case_list_from_queries(query_htmls, case_type, court):
         result_set.append(gdf)
 
     # Compile cases to a single series, clean case ids and remove duplicates (defendant cases)
-    cases = pd.concat([df['case_id'] for df in full_dfs]).map(ftools.clean_case_id).drop_duplicates()
+    case_ids = [df['case_id'] for df in full_dfs]
+    cases = pd.concat(case_ids).map(ftools.clean_case_id).drop_duplicates() if case_ids else []
     #
     # cases = [x for x in map(ftools.clean_case_id, list(cases)) if x]
     return cases
 
 
-def compile_query_list(query_dir, court, case_type=None, output=True):
-    ''' 
-    Take a directory of query htmls and create an index of unique UCIDs 
-    
+def compile_query_list(query_dir, court, case_type=None, output=True, drop_undownloaded=True):
+    '''
+    Take a directory of query htmls and create an index of unique UCIDs
+
     Input:
         - query_dir (str or Path): path to the directory that holds the queries
             i.e. a subdirectory like pacer/court/queries/something
         - court (str): court abbreviation
         - case_type (str or None): passed through to scrapers.parse_query_report
         - output (bool): if true, ouputs ucids to {query_dir}/index.csv
+        - drop_undownloaded (bool): if true, excludes ucids without corresponding HTML files (i.e. ucids that encountered download errors)
     Output:
         (pd.Series) a column of unique ucids from query htmls in query_dir
     '''
-    casenos = parse_docket_input([], query_dir, case_type=case_type, court=court)
+    casenos = parse_docket_input([], query_dir, case_type=case_type, court=court,)
+
     df = pd.DataFrame(casenos)
-    df['ucid'] = dtools.ucid(court, df['case_no'])
+    df['ucid'] = dtools.ucid(court, df['case_no']) if len(df) else pd.Series()
     df.drop_duplicates(inplace=True)
-    
-    if output:    
+
+    if drop_undownloaded:
+        df['file_exists'] = df.apply(lambda x: Path(ftools.get_expected_path(x['ucid'], subdir='html')).exists(), axis=1)
+        print(df)
+        df = df[df['file_exists']==True]
+
+    if output:
+        query_dir.mkdir(exist_ok=True,parents=True)
         df.ucid.to_csv(query_dir/'index.csv', index=False)
-    
+
     return df.ucid
 
 def parse_query_report(html_path, full_dfs, court, case_type):

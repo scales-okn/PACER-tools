@@ -9,119 +9,6 @@ from selenium.webdriver.common.keys import Keys
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from support.core import std_path
 
-class FormField:
-    ''' Object that represents a single field as part of a form'''
-    def __init__(self, name, kind, value, selector, browser):
-        self.name = name
-        self.kind = kind
-        self.value = value
-        self.selector = selector
-        self.browser = browser
-
-    def locate(self, get_many=False):
-        ''' Returns the web element'''
-        return locator(self.selector, self.browser, get_many)
-
-    def fill(self):
-        if self.kind == 'text':
-            el = self.locate()
-            try:
-                el.clear()
-            except:
-                time.sleep(2)
-                el = self.locate()
-                el.clear()
-            fill_text(self.selector, self.value, self.browser)
-            # send_keys(el, self.value)
-
-        elif self.kind == 'radio':
-            chosen = [el for el in self.locate(get_many=True) \
-                      if el.get_attribute('value')==self.value][0]
-            chosen.click()
-
-        elif self.kind == 'checkbox':
-            current_state = bool(self.locate().get_property('checked'))
-            if self.value != current_state:
-                self.locate().click()
-
-        # Selector for select should be for the select tag (not the options)
-        elif self.kind == 'select':
-            select_tag = self.locate()
-            # Set the value manually which is same as what happens in fill_text
-            fill_text(self.selector, self.value, self.browser)
-
-        # Locator fn for select should return array of elements
-        elif self.kind == 'multiselect':
-            # Split out comma-delimited
-            values = [str(v).strip() for v in self.value.split(',')]
-            options = self.locate(get_many=True)
-            subset = [el for el in options if _clean_options_(el) in values]
-            for el in subset:
-                el.click()
-
-    def __repr__(self):
-        return f'''<FormField: "{self.name}" (kind:{self.kind})>'''
-
-class FormButton:
-    def __init__(self, selector, browser):
-        self.browser = browser
-        self.selector = selector
-
-    def locate(self, get_many=False):
-        ''' Returns the web element'''
-        return locator(self.selector, self.browser)
-
-class FormFiller:
-    ''' Object used to fill out a webpage form '''
-
-    def __init__(self, browser, template, fill_values):
-        '''
-        Inputs:
-            - browser: selenium browser driver
-            - template ('query', 'login', 'docket' or dict): gets template from get_template, or else manual input as dict
-            - fill_values (dict): key-value pairs of (field name, value to fill)
-        '''
-        self.fields, self.buttons = {}, {}
-        self.browser = browser
-
-        self.template = get_template(template) if type(template) is str else template
-        self.build(fill_values)
-
-    def build(self, fill_values):
-        ''' Combine the template with the fill_values to create the FormFields'''
-        for field_name, props in self.template['fields'].items():
-            if field_name in fill_values:
-                field = FormField(field_name, props['kind'], fill_values[field_name],\
-                                  props['selector'], self.browser)
-                self.fields[field_name] = field
-
-        for button_name, selector in self.template['buttons'].items():
-            self.buttons[button_name] = FormButton(selector, self.browser)
-
-
-    def fill(self):
-        ''' Fill all field values in the form'''
-        for field in self.fields.values():
-            field.fill()
-
-        # If the form has a pre-submit method, execute it
-        if 'pre_submit' in self.template:
-            self.template['pre_submit'](self)
-
-    def submit(self):
-        ''' Click the form submit button '''
-        self.buttons['submit'].locate().click()
-
-def _clean_options_(el, first_only=True):
-    ''' Clean the text of an Option WebElement '''
-    try:
-        if first_only:
-            return el.text.strip().split()[0]
-        else:
-            return el.text.strip()
-    except:
-        return ''
-
 TEMPLATE_LOGIN = {
     'fields': {
         'username': {
@@ -143,7 +30,6 @@ TEMPLATE_LOGIN = {
         'submit':['input[type="submit"][value="Login"]', 'button[name="loginForm:fbtnLogin"]']
     }
 }
-
 
 TEMPLATE_DOCKET_SHEET = {
     'fields': {
@@ -247,29 +133,6 @@ TEMPLATE_DOCKET_SHEET = {
     },
     'pre_submit': lambda form: case_no_pre_submit(form)
 }
-def case_no_pre_submit(form):
-    '''Hit enter on case number field to start the lookup'''
-
-    if 'case_no' in form.fields:
-        case_num = form.fields['case_no'].locate()
-        case_num.send_keys(Keys.RETURN)
-
-
-    run_button = form.buttons['submit'].locate()
-
-    # Wait for the case lookup to run before you can 'Run Report'
-    for i in range(5):
-        if run_button.is_enabled():
-            break
-        # If the case selector appears, choose the first case (the main case)
-        elif form.browser.find_element_by_id('case_number_pick_area_0').is_displayed():
-            # Check if any checkbox ticked
-            docket_checkboxes = form.browser.find_elements_by_css_selector('#case_number_pick_area_0 input[type="checkbox"]')
-            if not any(box.is_selected() for box in docket_checkboxes):
-                # Click the first if none pre-selected (default to main)
-                docket_checkboxes[0].click()
-
-        time.sleep(1)
 
 TEMPLATE_QUERY = {
     'fields': {
@@ -380,6 +243,18 @@ TEMPLATE_QUERY = {
     'pre_submit': lambda form: case_no_pre_submit(form)
 }
 
+
+
+def _clean_options_(el, first_only=True):
+    ''' Clean the text of an Option WebElement '''
+    try:
+        if first_only:
+            return el.text.strip().split()[0]
+        else:
+            return el.text.strip()
+    except:
+        return ''
+
 def get_template(s):
     if s=='login':
         return TEMPLATE_LOGIN
@@ -419,6 +294,136 @@ def locator(css_selector, browser, get_many=False):
             return browser.find_element_by_css_selector(css_selector)
         except:
             return
+
+def case_no_pre_submit(form):
+    '''Hit enter on case number field to start the lookup'''
+
+    if 'case_no' in form.fields:
+        case_num = form.fields['case_no'].locate()
+        case_num.send_keys(Keys.RETURN)
+
+
+    run_button = form.buttons['submit'].locate()
+
+    # Wait for the case lookup to run before you can 'Run Report'
+    for i in range(5):
+        if run_button.is_enabled():
+            break
+        # If the case selector appears, choose the first case (the main case)
+        elif form.browser.find_element_by_id('case_number_pick_area_0').is_displayed():
+            # Check if any checkbox ticked
+            docket_checkboxes = form.browser.find_elements_by_css_selector('#case_number_pick_area_0 input[type="checkbox"]')
+            if not any(box.is_selected() for box in docket_checkboxes):
+                # Click the first if none pre-selected (default to main)
+                docket_checkboxes[0].click()
+
+        time.sleep(1)
+
+
+
+class FormField:
+    ''' Object that represents a single field as part of a form'''
+    def __init__(self, name, kind, value, selector, browser):
+        self.name = name
+        self.kind = kind
+        self.value = value
+        self.selector = selector
+        self.browser = browser
+
+    def locate(self, get_many=False):
+        ''' Returns the web element'''
+        return locator(self.selector, self.browser, get_many)
+
+    def fill(self):
+        if self.kind == 'text':
+            el = self.locate()
+            try:
+                el.clear()
+            except:
+                time.sleep(2)
+                el = self.locate()
+                el.clear()
+            fill_text(self.selector, self.value, self.browser)
+            # send_keys(el, self.value)
+
+        elif self.kind == 'radio':
+            chosen = [el for el in self.locate(get_many=True) \
+                      if el.get_attribute('value')==self.value][0]
+            chosen.click()
+
+        elif self.kind == 'checkbox':
+            current_state = bool(self.locate().get_property('checked'))
+            if self.value != current_state:
+                self.locate().click()
+
+        # Selector for select should be for the select tag (not the options)
+        elif self.kind == 'select':
+            select_tag = self.locate()
+            # Set the value manually which is same as what happens in fill_text
+            fill_text(self.selector, self.value, self.browser)
+
+        # Locator fn for select should return array of elements
+        elif self.kind == 'multiselect':
+            # Split out comma-delimited
+            values = [str(v).strip() for v in self.value.split(',')]
+            options = self.locate(get_many=True)
+            subset = [el for el in options if _clean_options_(el) in values]
+            for el in subset:
+                el.click()
+
+    def __repr__(self):
+        return f'''<FormField: "{self.name}" (kind:{self.kind})>'''
+
+class FormButton:
+    def __init__(self, selector, browser):
+        self.browser = browser
+        self.selector = selector
+
+    def locate(self, get_many=False):
+        ''' Returns the web element'''
+        return locator(self.selector, self.browser)
+
+class FormFiller:
+    ''' Object used to fill out a webpage form '''
+
+    def __init__(self, browser, template, fill_values):
+        '''
+        Inputs:
+            - browser: selenium browser driver
+            - template ('query', 'login', 'docket' or dict): gets template from get_template, or else manual input as dict
+            - fill_values (dict): key-value pairs of (field name, value to fill)
+        '''
+        self.fields, self.buttons = {}, {}
+        self.browser = browser
+
+        self.template = get_template(template) if type(template) is str else template
+        self.build(fill_values)
+
+    def build(self, fill_values):
+        ''' Combine the template with the fill_values to create the FormFields'''
+        for field_name, props in self.template['fields'].items():
+            if field_name in fill_values:
+                field = FormField(field_name, props['kind'], fill_values[field_name],\
+                                  props['selector'], self.browser)
+                self.fields[field_name] = field
+
+        for button_name, selector in self.template['buttons'].items():
+            self.buttons[button_name] = FormButton(selector, self.browser)
+
+    def fill(self):
+        ''' Fill all field values in the form'''
+        for field in self.fields.values():
+            field.fill()
+
+        # If the form has a pre-submit method, execute it
+        if 'pre_submit' in self.template:
+            self.template['pre_submit'](self)
+
+    def submit(self):
+        ''' Click the form submit button '''
+        self.buttons['submit'].locate().click()
+
+
 
 def config_builder(tmp):
     '''

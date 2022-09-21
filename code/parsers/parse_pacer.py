@@ -27,6 +27,7 @@ import support.data_tools as dtools
 import support.docket_entry_identification as dei
 import support.settings as settings
 import support.fhandle_tools as ftools
+from support.court_functions import COURTS_94
 from parsers.parse_summary import SummaryPipeline
 
 LOG_DIR = Path(__file__).parent/'logs'
@@ -623,48 +624,6 @@ def parse_docket(docket_table, reverse_docket=False):
     return out_rows
 
 
-def parse_stamp(html_text, llim=-400):
-    '''
-    Parse the stamp left by the scraper at the bottom of a html file
-
-    Inputs:
-        - html_text (str): the html text for the page
-        - llim (int): left limit of where to search in the html
-    Output:
-        dict with whatever k-v pairs are present (user, time, download_ulr...)
-    '''
-    try:
-        # Try to check for json stamp first
-        return parse_stamp_json(html_text)
-    except:
-        stamp_data = {}
-        re_data_str = r"<!-- SCALESDOWNLOAD;([\s\S]+) -->"
-
-        match = re.search(re_data_str,html_text[-llim:])
-        if match:
-            data_str = match.groups()[0]
-            for pair in data_str.split(';'):
-                k,v = re.split(':', pair, maxsplit=1)
-                stamp_data[k] = v
-        return stamp_data
-
-def parse_stamp_json(html_text):
-    ''' Parse the stamp (from stamp_json) of JSON serialized text'''
-
-    # Find the last line, by searching backwards
-    for rev_ind, char in enumerate(reversed(html_text)):
-        if char=='\n':
-            break
-    last_line = html_text[-rev_ind:]
-
-
-    # Parse the json string
-    json_str = last_line.lstrip('<!-').rstrip('->')
-    stamp_data = json.loads(json_str)
-
-    return stamp_data
-
-
 def get_city(html_text):
     '''
     Get the case city from the header (in parenthesis after court name)
@@ -836,7 +795,7 @@ def process_html_file(case, member_cases, court=None):
     if not no_docket_headers:
         docket_table = dei.identify_docket_table(soup)
         if docket_table:
-            case_data['docket'] = parse_docket(docket_table, 'BACKWARDS_DOCKET' in html_text)
+            case_data['docket'] = parse_docket(docket_table, 'BACKWARDS_DOCKET' in html_text and len(case['docket_paths'])==1)
             case_data['docket_available'] = True
 
     ### Store member cases in a csv
@@ -877,10 +836,13 @@ def process_html_file(case, member_cases, court=None):
     case_data['recap_id'] = None
 
     # Scraper stamp data
-    stamp_data = parse_stamp(html_text)
+    stamp_data = dtools.parse_stamp(html_text)
     case_data['download_url'] = stamp_data.get('download_url')
     case_data['case_pacer_id'] = stamp_data.get('pacer_id')
-    case_data['stub'] = 'stub' in stamp_data.get('slabels','').split(',')
+    slabels = stamp_data.get('slabels','').split(',')
+    case_data['is_stub'] = 'stub' in slabels
+    case_data['is_private'] = 'private' in slabels
+    case_data['scraper_labels'] = slabels
 
     # Deal with extra_case_data
     if extra_case_data:
@@ -915,13 +877,13 @@ def case_runner(case, output_dir, court, debug, force_rerun, count, member_df, l
     '''
     Case parser management
     '''
-    #Get the output file and check for its existence
+    # Get the output path (??? seems like it's trying to make sure to use the new get_expected_path)
     case_fname = Path(case['docket_paths'][0]).stem
-
     pacer_dir = Path(output_dir).resolve().parent.parent
     outname = ftools.get_expected_path(ucid=case['ucid'], pacer_path=pacer_dir)
     # outname = Path(output_dir) / f"{case_fname}.json"
-    if force_rerun or not outname.exists():
+
+    if force_rerun or not outname.exists(): # Check whether the output file exists already
         case_data = process_html_file(case, member_df, court = court)
         try:
             outname.parent.mkdir(exist_ok=True)
@@ -973,59 +935,66 @@ async def parse_async(n_workers, cases, output_dir, court, debug, force_rerun, c
         asyncio.gather(*tasks)
 
 
-def parse(input_dir, output_dir, summaries_dir, court=None, debug=False,
+def parse(input_dir, output_dir, summaries_dir, court=None, all_courts=False, debug=False,
     force_rerun=False, force_ucids=None, n_workers=16, log_parsed=False, recap_file=None):
 
-    input_dir = Path(input_dir).resolve()
-    output_dir = output_dir or (input_dir.parent/'json').resolve()
-    summaries_dir = summaries_dir or (input_dir.parent/'summaries').resolve()
+    if all_courts:
+        print('\nAll-court mode enabled')
+    for current_court in COURTS_94 if all_courts else [court]:
+        if all_courts:
+            print(f'\nRunning on {current_court}...')
 
-    # TODO switch in the data restructure update
-    hpaths = Path(input_dir).glob('*/*.html')
-    spaths = Path(summaries_dir).glob('*/*.html')
-    recap_df = None
-    # if recap_file:
-    #     recap_file = Path(recap_file)
-    #
-    #     if recap_file.exists():
-    #         recap_df = pd.read_csv(recap_file)
-    #         if 'use' in recap_df.columns:
-    #             recap_df = recap_df[recap_df.use].copy()
+        court_input_dir = Path(f'{input_dir}/{current_court}/html' if all_courts else input_dir).resolve()
+        court_output_dir = Path(f'{output_dir}/{current_court}/json' if all_courts else output_dir).resolve() if output_dir else (
+            court_input_dir.parent/'json').resolve()
+        court_summ_dir = Path(f'{summaries_dir}/{current_court}/summaries' if all_courts else summaries_dir).resolve() if summaries_dir else (
+            court_input_dir.parent/'summaries').resolve()
 
+        hpaths = Path(court_input_dir).glob('*/*.html')
+        spaths = Path(court_summ_dir).glob('*/*.html')
+        recap_df = None # Recap is deprecated
 
-    if force_ucids:
-        # Set force rerun to true
-        force_rerun = True
-        #Filter dwon cases by ucids of interst
-        force_ucid_series = pd.read_csv(force_ucids, usecols=('ucid',), squeeze=True)
+        if force_ucids:
+            force_rerun = True
+            force_ucid_series = pd.read_csv(force_ucids, usecols=('ucid',), squeeze=True) # Filter cases by ucids of interest
+            if all_courts:
+                force_ucid_series = [x for x in list(force_ucid_series) if x.split(';;')[0]==current_court] # confine to ucids in current court
+            cases = dtools.group_dockets(hpaths, court=current_court, use_ucids=force_ucid_series, summary_fpaths=spaths, recap_df=recap_df)
+        else:
+            cases = dtools.group_dockets(hpaths, court=current_court, summary_fpaths=spaths, recap_df=recap_df)
 
-        cases = dtools.group_dockets(hpaths, court=court, use_ucids=force_ucid_series, summary_fpaths=spaths, recap_df=recap_df)
-    else:
-        cases = dtools.group_dockets(hpaths, court=court, summary_fpaths=spaths, recap_df=recap_df)
+        count = {'skipped':0, 'parsed': 0}
 
-    count = {'skipped':0, 'parsed': 0}
+        member_cases = read_member_lead_df()
 
-    member_cases = read_member_lead_df()
+        if log_parsed:
+            # Inititate the file (will overwrite file with same name) and write the headers
+            if all_courts:
+                if '.' in log_parsed:
+                    split = log_parsed.split('.')
+                    logpath = LOG_DIR/(split[0]+f'_{current_court}.'+split[1])
+                else:
+                    logpath = LOG_DIR/(log_parsed+f'_{current_court}')
+            else:
+                logpath = LOG_DIR/log_parsed
+            with open(logpath, 'w') as wfile:
+                csv.writer(wfile).writerow(['ucid', 'fpath'])
 
-    if log_parsed:
-        # Inititate the file (will overwrite file with same name) and write the headres
-        with open(LOG_DIR/log_parsed, 'w') as wfile:
-            csv.writer(wfile).writerow(['ucid', 'fpath'])
+        if debug:
+            for case in cases:
+                case_runner(case, court_output_dir, current_court, debug, force_rerun, count, member_cases, log_parsed)
+        else:
+            asyncio.run(parse_async(n_workers, cases, court_output_dir, current_court, debug, force_rerun, count, member_cases, log_parsed))
 
-    if debug:
-        for case in cases:
-            case_runner(case, output_dir, court, debug, force_rerun, count, member_cases, log_parsed)
-    else:
-        asyncio.run(parse_async(n_workers, cases, output_dir, court, debug, force_rerun, count, member_cases, log_parsed))
+        n = sum(count.values())
+        print(f"\nProcessed {n:,} cases in {Path(court_output_dir)}:")
+        print(f" - Parsed: {count['parsed']:,}")
+        print(f" - Skipped: {count['skipped']:,}")
+        if log_parsed:
+            print(f"Table of successfully parsed cases at: {logpath.resolve()}")
 
-    n = sum(count.values())
-    print(f"\nProcessed {n:,} cases in {Path(output_dir)}:")
-    print(f" - Parsed: {count['parsed']:,}")
-    print(f" - Skipped: {count['skipped']:,}")
-    if log_parsed:
-        print(f"Table of successfully parsed cases at: {(LOG_DIR/log_parsed).resolve()}")
+        tidy_member_cases_df()
 
-    tidy_member_cases_df()
 
 @click.command()
 @click.argument('input-dir')
@@ -1035,6 +1004,8 @@ def parse(input_dir, output_dir, summaries_dir, court=None, debug=False,
                 help="Directory to place parsed output, if none provided defaults to INPUT_DIR/summaries ")
 @click.option('--court', '-c', default=None,
                 help ="Court abbrv, if none given infers from directory")
+@click.option('--all-courts', '-a', is_flag=True, default=False,
+               help='If true, iterates over all courts (and assumes that input_dir is the parent directory of all the courts')
 @click.option('--debug', '-d', default=False, is_flag=True,
                 help="Doesn't use multithreading")
 @click.option('--force-rerun', '-f', default=False, is_flag=True,

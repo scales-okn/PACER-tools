@@ -90,7 +90,7 @@ For example, the case `1:16-cv-00001` in the Northern District of Illinois would
 *Note: In some districts it is common to include judge initials at the end of a case id e.g. `2:15-cr-11112-ABC-DE` . These initials are always excluded from a UCID*.
 
 ## Runtime
-The scraper is designed to run at night to reduce its impact on server load. By default it will only run between 8pm and 4am (CDT). These parameters can be altered and overridden through the `-rts,` `-rte` and `--override-time` options, see below for details.
+The scraper is designed to run at night to reduce its impact on server load. By default it will only run between 6pm and 6am (CDT). These parameters can be altered and overridden through the `-rts,` `-rte` and `--override-time` options, see below for details.
 
 ## $$$
 Pacer fees can rack up quickly! Running this scraper will incur costs to your own Pacer account.  There are a number of options for the scraper that exist to limit the potential for accidentally incurring large charges:
@@ -150,7 +150,7 @@ Give slightly more verbose logging output
 *Query Scraper*
 
  - `-qc, --query-conf TEXT` 
- Configuration file (.json) for the query that will be used to populate the query form on Pacer. If none is specified the query builder will run in the terminal.
+ Configuration file (.json) for the query that will be used to populate the query form on Pacer. If none is specified the query builder will run in the terminal. (The query config format is fully described in the TEMPLATE_QUERY object in [forms.py](./forms.py), the most used fields are "filed_from", "filed_to", "nature_suit" and "case_status")
 
   - `--query-prefix TEXT`
   A prefix for the filenames of output query HTMLs. If date range of the query is greater than 180 days, the query will be split into chunks of 31 days to prevent PACER crashing while serving a large query results page. Multiple files will be created that follow the pattern `{query_prefix}__i.html` where `i` enumerates over the date range chunks.

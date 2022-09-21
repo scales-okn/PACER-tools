@@ -331,14 +331,21 @@ def docket_aggregator(fpaths, outfile=None):
         fpath = Path(fpath)
         if fpath.suffix == '.html':
 
-            soup = BeautifulSoup(open(fpath, 'r', encoding='utf-8').read(), "html.parser")
+            try:
+                hdata = open(fpath, 'r', encoding='utf-8').read()
+            except:
+                hdata = open(fpath, 'r', encoding='windows-1252').read()
+            soup = BeautifulSoup(hdata, "html.parser")
 
             tables = soup.select('table')
             docket_table = None
             if len(tables) >= 2:
                 docket_table = tables[-2]
                 if dei.is_docket_table(docket_table):
-                    rows.extend(docket_table.select('tr')[1:])
+                    new_rows = docket_table.select('tr')[1:]
+                    if 'BACKWARDS_DOCKET' in hdata:
+                        new_rows.reverse()
+                    rows.extend(new_rows)
 
         # Assuming json implies recap
         elif fpath.suffix == '.json':
@@ -410,7 +417,7 @@ def doc_id_from_pdf_header(fpath):
     re_doc_header_stamp = re.compile(rf"""
         (?P<caseno>{re_case_no_gr})  # the case no
         [^\d]+    # any non digit
-        (?P<doc_no>\d+) # the document no. just using the first digits found
+        (?P<doc_no>\d+)(?!\d|/) # the document no. just using the first digits found - but exclude dates
         (\-(?P<att_index>\d+))?
         """,
         flags=re.X|re.I
@@ -595,23 +602,65 @@ def filename_to_ucid(fname, court):
     case_id = clean_case_id(fpath.stem)
     return dtools.ucid(court, case_id)
 
-def build_sel_filename_from_ucid(ucid):
+def build_sel_filename_from_ucid(ucid, collection_location=None):
     year = ucid.split(";;")[1].split(":")[1][0:2]
     # court is the first sub-directory within the SEL_dor
     court = ucid.split(';;')[0]
     # replace the colons and semi-colons with dashes
     fbase = ucid.replace(';;','-').replace(':','-') +'.jsonl'
-    fname = settings.DIR_SEL / court / year / fbase
+
+    if not collection_location:
+        base_dir = settings.DIR_SEL
+    else:
+        base_dir = collection_location
+
+    fname = base_dir / court / year / fbase
+    
+    return fname
+
+def build_counsel_filename_from_ucid(ucid, collection_location=None):
+    year = ucid.split(";;")[1].split(":")[1][0:2]
+    # court is the first sub-directory within the SEL_dor
+    court = ucid.split(';;')[0]
+    # replace the colons and semi-colons with dashes
+    fbase = ucid.replace(';;','-').replace(':','-') +'.jsonl'
+    if not collection_location:
+        base_dir = settings.COUNSEL_DIS_DIR
+    else:
+        base_dir = collection_location
+
+    fname = base_dir / court / year / fbase
 
     return fname
 
-def build_counsel_filename_from_ucid(ucid):
+def build_firm_filename_from_ucid(ucid, collection_location=None):
     year = ucid.split(";;")[1].split(":")[1][0:2]
     # court is the first sub-directory within the SEL_dor
     court = ucid.split(';;')[0]
     # replace the colons and semi-colons with dashes
     fbase = ucid.replace(';;','-').replace(':','-') +'.jsonl'
-    fname = settings.COUNSEL_DIS_DIR / court / year / fbase
+    if not collection_location:
+        base_dir = settings.FIRM_DIS_DIR
+    else:
+        base_dir = collection_location
+
+    fname = base_dir / court / year / fbase
+
+    return fname
+
+
+def build_party_filename_from_ucid(ucid, collection_location=None):
+    year = ucid.split(";;")[1].split(":")[1][0:2]
+    # court is the first sub-directory within the SEL_dor
+    court = ucid.split(';;')[0]
+    # replace the colons and semi-colons with dashes
+    fbase = ucid.replace(';;','-').replace(':','-') +'.jsonl'
+    if not collection_location:
+        base_dir = settings.PARTY_DIS_DIR
+    else:
+        base_dir = collection_location
+
+    fname = base_dir / court / year / fbase
 
     return fname
 
@@ -630,7 +679,7 @@ def get_doc_path(doc_id):
     ucid, _ = doc_id.split('_', maxsplit=1)
     court = dtools.parse_ucid(ucid)['court']
     year_part = decompose_caseno(ucid)['year']
-    import pdb;pdb.set_trace()
+    # import pdb;pdb.set_trace()
 
     # Use glob to get candidate list (will also return attachments with subindexes e.g. "_3...", "_3_1...", "_3_2...")
     cand = (settings.PACER_PATH/court/'docs'/year_part).glob(doc_id+'*')

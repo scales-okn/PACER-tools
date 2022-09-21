@@ -72,7 +72,7 @@ def get_edges_to_target(target_ind, edges):
 
 def remove_sensitive_info(docket):
     '''
-    Take a docket (html or json) and remove social security numbers and A-numbers
+    Take a string (e.g. the raw text of a docket html or json) and remove social security numbers and A-numbers
     '''
     ssn_re = re.compile(r"(?i)([^0-9])((?:ssn?:?)? *#?\d{3}-\d{2}-\d{4})([^0-9])")
     a_number_re = re.compile(r"(?i)([^0-9a-z])(a\d{8,9})([^0-9])")
@@ -415,6 +415,47 @@ def extra_info_cleaner(raw_info, replace_breaks_with_newlines=True, remove_tags=
 
     return clean_info or None
 
+def parse_stamp_json(html_text):
+    ''' Parse the stamp (from stamp_json) of JSON serialized text'''
+
+    # Find the last line, by searching backwards
+    for rev_ind, char in enumerate(reversed(html_text)):
+        if char=='\n':
+            break
+    last_line = html_text[-rev_ind:]
+
+
+    # Parse the json string
+    json_str = last_line.lstrip('<!-').rstrip('->')
+    stamp_data = json.loads(json_str)
+
+    return stamp_data
+
+def parse_stamp(html_text, llim=-400):
+    '''
+    Parse the stamp left by the scraper at the bottom of a html file
+
+    Inputs:
+        - html_text (str): the html text for the page
+        - llim (int): left limit of where to search in the html
+    Output:
+        dict with whatever k-v pairs are present (user, time, download_ulr...)
+    '''
+    try:
+        # Try to check for json stamp first
+        return parse_stamp_json(html_text)
+    except:
+        stamp_data = {}
+        re_data_str = r"<!-- SCALESDOWNLOAD;([\s\S]+) -->"
+
+        match = re.search(re_data_str,html_text[-llim:])
+        if match:
+            data_str = match.groups()[0]
+            for pair in data_str.split(';'):
+                k,v = re.split(':', pair, maxsplit=1)
+                stamp_data[k] = v
+        return stamp_data
+
 
 
 def standardize_recap_date(tdate):
@@ -656,7 +697,7 @@ def remap_recap_data(recap_fpath=None, rjdata=None):
             # Billing keys
             **{k:None for k in ['billable_pages', 'cost', 'n_docket_reports']},
             # Scraper things
-            **{k:None for k in ['download_timestamp', 'download_url', 'docket_available', 'member_case_key', 'stub']}
+            **{k:None for k in ['download_timestamp', 'download_url', 'docket_available', 'member_case_key', 'is_stub']}
         }
         return fdata
     else:
@@ -677,6 +718,9 @@ def year_check(dstring, year_pull):
     else:
         year_diff = 0
     return year_diff
+
+def get_uft_year(filing_date):
+    return filing_date.split('/')[-1]
 
 def generate_unique_filepaths(outfile=None, nrows=None):
     '''
@@ -733,14 +777,18 @@ def unique_filepaths_updater(table_file, update_iter, outfile=None, force=False)
         new_fpaths_series = pd.Series(to_update)
         to_update = new_fpaths_series[~new_fpaths_series.isin(df.fpath)].to_list()
 
-    new_df = convert_filepaths_list(file_iter=to_update)
+    if to_update:
+        new_df = convert_filepaths_list(file_iter=to_update)
 
-    # Concatenate to make table for output
-    out_df = pd.concat((df, new_df))
+        # Concatenate to make table for output
+        out_df = pd.concat((df, new_df))
 
-    # Drop the original lines if force is true
-    if force:
-        out_df = outdf[~outdf.index.duplicated(keep='last')]
+        # Drop the original lines if force is true
+        if force:
+            out_df = out_df[~out_df.index.duplicated(keep='last')]
+
+    else:
+        out_df = df
 
     if outfile:
         out_df.to_csv(outfile)
@@ -767,20 +815,20 @@ def convert_filepaths_list(infile=None, outfile=None, file_iter=None, nrows=None
     #c: case json, f: filepath
     dmap = {
         'court': lambda c,f: c['download_court'] if is_recap(f) else Path(f).parents[2].name,
-        'year': lambda c,f: c['filing_date'].split('/')[-1],
+        'year': lambda c,f: get_uft_year(c['filing_date']),
         'filing_date': lambda c,f: c['filing_date'],
         'terminating_date': lambda c,f: c.get('terminating_date'),
         'case_id': lambda c,f: ftools.clean_case_id(c['case_id']),
         'case_type': lambda c,f: c['case_type'],
         'nature_suit': lambda c,f: dei.nos_matcher(c['nature_suit'], short_hand=True) or '',
         'judge': lambda c,f: jf.clean_name(c.get('judge')),
-        'recap': lambda c,f: 'recap' in c['source'],
+        # 'recap': lambda c,f: 'recap' in c['source'],
         'is_multi': lambda c,f: c['is_multi'],
         'is_mdl': lambda c,f: c['is_mdl'],
         'mdl_code': lambda c,f: c['mdl_code'],
-        'has_html': lambda c,f: 'pacer' in c['source'],
-        'source': lambda c,f: c['source']
-
+        # 'has_html': lambda c,f: 'pacer' in c['source'],
+        # 'source': lambda c,f: c['source'],
+        'is_stub': lambda c,f: c['is_stub'] if 'is_stub' in c else c['stub'] # 'stub' won't be needed after parser v3.5
     }
 
     properties = list(dmap.keys())
@@ -788,7 +836,7 @@ def convert_filepaths_list(infile=None, outfile=None, file_iter=None, nrows=None
     def get_properties(fpath):
         ''' Get the year, court and type for the case'''
         try:
-            case = load_case(fpath)
+            case = load_case(fpath, skip_scrubbing=True)
         except:
             print(f'LOAD_ERROR: error loading case {fpath}')
             return 'LOAD_ERROR'
@@ -810,7 +858,7 @@ def convert_filepaths_list(infile=None, outfile=None, file_iter=None, nrows=None
         df = pd.DataFrame(paths, columns=['fpath'])
     elif infile:
         # Read in text file of filepath names
-        df = pd.read_csv(std_path(infile), names=['fpath'], nrows=nrows)
+        df = pd.read_csv(std_path(infile), nrows=nrows)[['fpath']]
     else:
         raise ValueError("Must provide either 'infile' or 'file_list'")
 
@@ -926,7 +974,7 @@ def get_case_counts(gb_cols=[], qstring=None):
     df = load_unique_files_df().query(qstring) if qstring else load_unique_files_df()
     return df.groupby(['year', 'court', *gb_cols], dropna=False).size().reset_index(name='case_count')
 
-def load_case(fpath=None, html=False, recap_orig=False, ucid=None, skip_scrubbing=False, mongo_db=False):
+def load_case(fpath=None, html=False, recap_orig=False, ucid=None, skip_scrubbing=False, mongo_db=None):
     '''
     Loads the case given its filepath
 
@@ -948,7 +996,7 @@ def load_case(fpath=None, html=False, recap_orig=False, ucid=None, skip_scrubbin
         subdir = 'html' if html else 'json'
         fpath = ftools.get_expected_path(ucid, subdir=subdir)
 
-    if mongo_db:
+    if mongo_db is not None:
         collection = 'cases_html' if html else 'cases'
         res = mongo_db[collection].find_one({'ucid':ucid})
         return res
@@ -1592,3 +1640,18 @@ def run_in_executor(f):
         loop = asyncio.get_running_loop()
         return loop.run_in_executor(None, lambda: f(*args, **kwargs))
     return inner
+
+def load_EDGAR():
+    """EDGAR data was scraped from their open source portals and parsed using
+    BS4. The resulting data is stored in our annotation directory.
+    The scripts used to gather and clean the initial data currently live in
+    research_dev/code/research/disambiguation/parties_scrapers.py
+    """
+    epath = settings.EDGAR
+    df = pd.read_csv(epath)
+
+    df['entity_name'] = df.entity_name.astype(str)
+    df['normalized'] = df.normalized.astype(str)
+    df['cik'] = df.cik.apply(lambda x: str(x).zfill(10))
+
+    return df

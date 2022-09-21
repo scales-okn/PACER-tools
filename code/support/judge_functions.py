@@ -38,7 +38,7 @@ def load_JEL():
     ''' Load the JEL file '''
     return pd.read_json(settings.JEL_JSONL, lines=True)
 
-def load_SEL(ucid, as_df = True):
+def load_SEL(ucid, as_df = True, collection_location=None):
     '''
     Load SEL data (from relevant .jsonl files in the SEL_DIR)
 
@@ -57,7 +57,7 @@ def load_SEL(ucid, as_df = True):
     SEL_rows = []
     for each in ucid:
         # create filepath
-        fname = ftools.build_sel_filename_from_ucid(each)
+        fname = ftools.build_sel_filename_from_ucid(each, collection_location)
         # load file
         results = []
         if fname.exists():

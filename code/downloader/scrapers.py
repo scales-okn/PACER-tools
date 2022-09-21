@@ -15,6 +15,7 @@ import xmltodict
 import pandas as pd
 from bs4 import BeautifulSoup
 from seleniumrequests import Firefox
+from selenium.webdriver.common.by import By
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from downloader import forms
@@ -154,7 +155,7 @@ class CoreScraper:
     ''' Base class that contains common methods/attributes for all scapers'''
 
     def __init__(self, court_dir, court, auth_path, headless, verbose, slabels=[], n_workers=N_WORKERS, exclusions_path=None, case_type=None,
-                 ind='#', case_limit=None, time_restriction=None, rts=None, rte=None):
+                 ind='#', case_limit=None, cost_limit=None, time_restriction=None, rts=None, rte=None):
         self.browser = None
         self.headless = headless
         self.verbose = verbose
@@ -166,6 +167,7 @@ class CoreScraper:
         self.case_type = case_type
         self.ind = ind
         self.case_limit = case_limit
+        self.cost_limit = cost_limit
         self.time_restriction = time_restriction
         self.rts = rts or stools.PACER_HOURS_START
         self.rte = rte or stools.PACER_HOURS_END
@@ -293,8 +295,8 @@ class CoreScraper:
 
     def get_transaction_table(self):
         """ Find the transaction table element from a page, if it exists """
-        cand = self.browser.find_elements_by_css_selector('table')[-1]
-        if cand.find_element_by_css_selector('tr th').text == PSC_TEXT:
+        cand = self.browser.find_elements(By.CSS_SELECTOR, 'table')[-1]
+        if cand.find_element(By.CSS_SELECTOR, 'tr th').text == PSC_TEXT:
             return cand
         else:
             return None
@@ -315,7 +317,7 @@ class QueryScraper(CoreScraper):
 
     def results_found(self):
         ''' Returns False if query leads to "No information was found" page, else True'''
-        return not self.browser.find_element_by_css_selector('#cmecfMainContent h2').text.startswith('No information was found')
+        return not self.browser.find_element(By.CSS_SELECTOR, '#cmecfMainContent h2').text.startswith('No information was found')
 
     def submit_btn_disabled(self, query_form):
         ''' Checks if still on query page with the submit/run button is disabled'''
@@ -379,8 +381,8 @@ class QueryScraper(CoreScraper):
                 else:
                     logging.info(f"No results found for chunk with index:{i}\
                         (filed_from:{config_chunk.get('filed_from')}, filed_to:{config_chunk.get('filed_to')})")
-            except:
-                logging.info('Error with this chunk')
+            except Exception as e:
+                logging.info('Error with this chunk: ' + str(e))
                 continue
 
         logging.info(f"Query results saved to {self.dir.queries}")
@@ -412,45 +414,48 @@ class DocketScraper(CoreScraper):
     def __repr__(self):
         return f"<Docket Scraper:{self.ind}>"
 
-    def at_confirm_long_case(self):
-        '''Check if we get the 'are you sure you want to download this long case' page'''
-        return "The report may take a long time to run" in self.browser.page_source
-
     def at_docket_report(self):
         '''Check if the page is actually a docket report (success)'''
-        if len(self.browser.find_elements_by_css_selector('#cmecfMainContent h3')):
-            return "DOCKET FOR CASE" in self.browser.find_element_by_css_selector('#cmecfMainContent h3').text
+        if len(self.browser.find_elements(By.CSS_SELECTOR, '#cmecfMainContent h3')):
+            return "DOCKET FOR CASE" in self.browser.find_element(By.CSS_SELECTOR, '#cmecfMainContent h3').text
         else:
             return False
 
     def at_invalid_case(self):
         ''' Check if at the "Not a valid case" page '''
-        return "not a valid case. Please enter a valid value" in self.browser.find_element_by_css_selector('#cmecfMainContent').text[:200]
+        return "not a valid case. Please enter a valid value" in self.browser.find_element(By.CSS_SELECTOR, '#cmecfMainContent').text[:200]
 
     def at_sealed_case(self):
         ''' Check if at the "Not a valid case" page '''
-        if not len(self.browser.find_elements_by_css_selector('#cmecfMainContent h3')):
-            text = self.browser.find_element_by_css_selector('#cmecfMainContent').text[:200]
+        if not len(self.browser.find_elements(By.CSS_SELECTOR, '#cmecfMainContent h3')):
+            text = self.browser.find_element(By.CSS_SELECTOR, '#cmecfMainContent').text[:200]
             if re.search(r"seal|restric|redac|protectiv", text, re.I):
                 return True
         return False
 
     def no_docketlines(self):
         ''' Check if no docket lines (message: "...none satisfy the selection criteria")'''
-        return bool(re.search(stools.re_no_docket, self.browser.find_element_by_css_selector('#cmecfMainContent').text))
+        return bool(re.search(stools.re_no_docket, self.browser.find_element(By.CSS_SELECTOR, '#cmecfMainContent').text))
 
     def at_longtime(self):
         ''' Check if at the "The report may take a long time..." page '''
         longtime_str = "report may take a long time to run because this case has many docket entries"
-        return longtime_str in self.browser.find_element_by_css_selector('#cmecfMainContent').text[:200]
+        try:
+            page_text = self.browser.find_element(By.CSS_SELECTOR, '#cmecfMainContent').text[:200]
+            return longtime_str in page_text
+        except selenium.common.exceptions.NoSuchElementException:
+            return False
 
     @run_in_executor
     def pull_case(self, case, new_member_list_seen):
         '''
         Pull the docket from a single case
-        Inputs
+        Inputs:
             - case (dict): dictionary with case details (case_no, latest_date, previously_downloaded, def_no)
             - new_member_list_seen (list): list of new member cases being updated during session
+        Outputs:
+            - outpath (str): the path to the file that was just written
+            - cost (float): the cost of this download, as listed in the transaction table at the bottom of the document
         '''
         # Navigate to docket report page
         if not self.browser:
@@ -501,14 +506,14 @@ class DocketScraper(CoreScraper):
         docket_report_form = forms.FormFiller(self.browser, 'docket', fill_values)
         docket_report_form.fill()
 
-        # Call the possible case no api again to get caseno data
+        # Call the possible case no api again to get pacer_id
         pacer_id = self.get_caseno_info_id(case['case_no'], case.get('def_no'))
 
         # Submit the form
         docket_report_form.submit()
         time.sleep(PAUSE['mini'])
 
-        # Initialise task line
+        # Initialise task line (for when in docket-update mode)
         task_line = {k:case[k] for k in ('ucid', 'latest_date', 'previously_downloaded') if k in case}
 
         # Checks before form submission stage complete
@@ -517,7 +522,7 @@ class DocketScraper(CoreScraper):
             #Check if at "may take a long time page"
             if self.at_longtime():
 
-                initially_requested = self.browser.find_elements_by_css_selector('input[name="date_from"]')[-1]
+                initially_requested = self.browser.find_elements(By.CSS_SELECTOR, 'input[name="date_from"]')[-1]
                 initially_requested.click()
                 time.sleep(PAUSE['micro'])
 
@@ -562,7 +567,7 @@ class DocketScraper(CoreScraper):
 
         elif self.at_sealed_case():
             print(f"Sealed case: {case['case_no']}")
-            text = self.browser.find_element_by_css_selector('#cmecfMainContent').text[:200]
+            text = self.browser.find_element(By.CSS_SELECTOR, '#cmecfMainContent').text[:200]
             print(f'Explanation from PACER: {text}')
 
             if self.docket_update:
@@ -596,9 +601,8 @@ class DocketScraper(CoreScraper):
             if no_docketlines:
                 logging.info(f'No new docket lines for case: {case["case_no"]}')
 
+            # If necessary, create "..._n.html" etc. filename for nth update to case
             if case.get('previously_downloaded', False):
-
-                # Create "..._n.html" etc. filename for nth update to case
                 ind = 0
                 while outpath.exists():
                     ind += 1
@@ -606,12 +610,14 @@ class DocketScraper(CoreScraper):
 
             time.sleep(PAUSE['micro'])
             download_url = self.browser.current_url
+            page_source = self.browser.page_source
+            cost = float(ftools.parse_transaction_history(page_source)['cost'])
 
             # Make sure parent directory exists, which will be the year-part
             outpath.parent.mkdir(exist_ok=True, mode=0o775)
             with open(outpath, "w+") as wfile:
                 # Add the stamp to the bottom of the url as it is written
-                wfile.write(self.browser.page_source + self.stamp(download_url, pacer_id=pacer_id))
+                wfile.write(page_source + self.stamp(download_url, pacer_id=pacer_id))
 
             if self.docket_update:
                 # Get the download path relative to project root folder
@@ -627,7 +633,7 @@ class DocketScraper(CoreScraper):
                     wfile.write( json.dumps(task_line)+'\n' )
 
             #Check to see if it is a member case
-            #TODO: also for always?
+            #TODO: also for self.show_member_list=='always'?
             if self.show_member_list=='avoid':
                 contents = open(outpath, 'rb').read()
                 found_members = self.re_mem.findall(str(contents))
@@ -636,7 +642,7 @@ class DocketScraper(CoreScraper):
                     found_case_ids = [ftools.clean_case_id(x) for x in set(found_case_ids) if x not in self.member_list_seen]
                     new_member_list_seen += found_case_ids
 
-            return outpath
+            return outpath, cost
 
         else:
             print(f'ERROR: <case: {case["ucid"]}> not found, reason unknown')
@@ -674,30 +680,6 @@ def check_exists(subdir, court=None, case_no=None, ucid=None, def_no=None, pacer
 
     return exists
 
-
-# Note: deprecating because it fails in directories with many files when run in docker (the `ls` command gives an OS error)
-# def get_downloaded_cases(court_dir, summaries=False):
-#     '''
-#     Create a df of all dockets in this court_dir html folder with filepath, ucid columns
-#     Inputs:
-#         - court_dir(PacerCourtDir)
-#         - summaries (bool): if True check downloaded summaries, else by default check for dockets
-#     Output:
-#         DataFrame (with cols: filepath, case_no, ucid)
-#     '''
-#     sub_dir = court_dir.summaries if summaries else court_dir.html
-#     all_cases = list(sub_dir.glob('*.html'))
-
-#     data = [(str(p), ftools.clean_case_id(p.stem) ) for p in all_cases]
-#     df = pd.DataFrame(data, columns=['fpath', 'case_no'])
-
-#     # Remove dockets that are docket update html files
-#     re_up = r'.*_\d{1,3}.html$'
-#     df = df[~df.fpath.str.match(re_up)].copy()
-
-#     df['ucid'] = dtools.ucid(court_dir.court, df.case_no)
-
-#     return df[['ucid', 'fpath']]
 
 def get_excluded_cases(exclusions_path, court):
     ''' Get the excluded cases'''
@@ -755,7 +737,7 @@ def _pull_summary_(ScraperInstance, case):
 
     # Find the Case Summary a tag
     a_candidates = [
-        a for a in self.browser.find_elements_by_css_selector('td a')
+        a for a in self.browser.find_elements(By.CSS_SELECTOR, 'td a')
         if 'qrySummary' in (a.get_attribute('href') or '')
     ]
 
@@ -781,7 +763,7 @@ def _pull_summary_(ScraperInstance, case):
 
 def case_is_sealed(browser):
     ''' Check if "This case is sealed" has appeared on query form page '''
-    case_number_area = browser.find_elements_by_css_selector('#case_number_area')
+    case_number_area = browser.find_elements(By.CSS_SELECTOR, '#case_number_area')
     if len(case_number_area):
         text = case_number_area[0].text
         if re.search(r"seal|restric|redac|protectiv", text, re.I):
@@ -790,7 +772,7 @@ def case_is_sealed(browser):
 
 def summary_no_data(browser):
     ''' Check if the "No case data for case <case>" message has appeared'''
-    return "No case data for case" in browser.find_element_by_css_selector('#cmecfMainContent').text[:300]
+    return "No case data for case" in browser.find_element(By.CSS_SELECTOR, '#cmecfMainContent').text[:300]
 
 class SummaryScraper(CoreScraper):
 
@@ -989,13 +971,13 @@ class DocumentScraper(CoreScraper):
     def at_document_selection(self):
         '''Check if browser is at the document selection menu'''
         re_doc_selection = "Document Selection Menu"
-        main_content = self.browser.find_elements_by_css_selector("div#cmecfMainContent")[0]
+        main_content = self.browser.find_elements(By.CSS_SELECTOR, "div#cmecfMainContent")[0]
         return bool(re.match(rf"^\s+{re_doc_selection}.*", main_content.text))
 
     def at_predownload(self):
         '''Check if at a 'pre-download' pdf embed page, file hasn't downloaded, open button appears'''
-        main_content = self.browser.find_elements_by_css_selector("div#cmecfMainContent")[0]
-        iframe = main_content.find_elements_by_css_selector("iframe")
+        main_content = self.browser.find_elements(By.CSS_SELECTOR, "div#cmecfMainContent")[0]
+        iframe = main_content.find_elements(By.CSS_SELECTOR, "iframe")
         return bool(main_content) and len(iframe)
 
     def cannot_redisplay(self):
@@ -1007,7 +989,7 @@ class DocumentScraper(CoreScraper):
         if len(tabs) >1:
             try:
                 self.browser.switch_to.window(tabs[-1])
-                if self.browser.find_element_by_css_selector('body').text\
+                if self.browser.find_element(By.CSS_SELECTOR, 'body').text\
                                 .startswith('Cannot redisplay'):
                     resp = True
 
@@ -1022,17 +1004,17 @@ class DocumentScraper(CoreScraper):
 
     def at_receipt(self):
         ''' Are we at the document receipt page'''
-        main_content = self.browser.find_elements_by_css_selector("div#cmecfMainContent")[0]
+        main_content = self.browser.find_elements(By.CSS_SELECTOR, "div#cmecfMainContent")[0]
         return main_content.text.startswith("To accept charges shown below")
 
     def at_outside_warning(self):
         ''' Are we at the "Warning... link from outside..." page '''
-        main_content = self.browser.find_elements_by_css_selector("div#cmecfMainContent")[0]
+        main_content = self.browser.find_elements(By.CSS_SELECTOR, "div#cmecfMainContent")[0]
         return main_content.text.startswith('Warning: The link to this page may not have originated from within')
 
     def at_no_permission(self):
         ''' Are we at the "You do not have permission... " page '''
-        main_content = self.browser.find_elements_by_css_selector("div#cmecfMainContent")[0]
+        main_content = self.browser.find_elements(By.CSS_SELECTOR, "div#cmecfMainContent")[0]
         return main_content.text.startswith("You do not have permission")
 
     def clean_att_index(self,att_index):
@@ -1094,14 +1076,14 @@ class DocumentScraper(CoreScraper):
 
         if self.at_outside_warning():
             # Click continue
-            self.browser.find_element_by_link_text("Continue").click()
+            self.browser.find_element(By.LINK_TEXT, "Continue").click()
 
         if self.at_document_selection():
             try:
                 # Click the link for the document number at top of the screen
-                first_row = self.browser.find_element_by_css_selector('tr')
+                first_row = self.browser.find_element(By.CSS_SELECTOR, 'tr')
                 if self.is_main_doc_row(first_row):
-                    atag = first_row.find_element_by_css_selector('a')
+                    atag = first_row.find_element(By.CSS_SELECTOR, 'a')
                     doc = stools.get_single_link(atag, mode='selenium')
                     # Re run pull_doc on new doc gathered from selection screen
                     return self.pull_doc(doc, ucid, att, from_doc_selection=True)
@@ -1117,11 +1099,11 @@ class DocumentScraper(CoreScraper):
                 logging.info(f"{self} <case:{doc_id}> Transaction Receipt: {json.dumps(transaction_data)}")
 
             view_selector = 'input[type="submit"][value="View Document"]'
-            view_btn = self.browser.find_element_by_css_selector(view_selector)
+            view_btn = self.browser.find_element(By.CSS_SELECTOR, view_selector)
             # view_btn.click()
 
             # Use goDLS command directly
-            form = self.browser.find_element_by_css_selector('form')
+            form = self.browser.find_element(By.CSS_SELECTOR, 'form')
             on_submit_command = form.get_attribute('onsubmit')
             # Grab the first command
             go_DLS_command = on_submit_command.split(';', maxsplit=1)[0]
@@ -1154,7 +1136,7 @@ class DocumentScraper(CoreScraper):
             return False
 
 ###
-# Support Functions for Docket Scraper
+# Support Functions for Document Scraper
 ###
 
 def generate_dockets_list(document_input, core_args, skip_seen=True, all_docs=False):
@@ -1180,10 +1162,10 @@ def generate_dockets_list(document_input, core_args, skip_seen=True, all_docs=Fa
 
     # All docs check
     if ('doc_no' not in df.columns) and (not all_docs):
-        logging.info(f'\nALL DOCS: No `doc_no` column found in document-input. Use --all-docs flag if you want all docs per case ($$$)\n')
+        logging.info(f'\nALL DOCS: No `doc_no` column found in document-input. Use the --document-all-docs flag if you want all docs per case ($$$)\n')
         return []
 
-    # If there's a doc_no column, remove any rows where the doc_no column is empty (force user to use --document-all-docs mode)
+    # If there's a doc_no column, remove any rows where the doc_no column is empty (like above, the only way around this is to use --document-all-docs)
     if 'doc_no' in df.columns:
         df = df[df.doc_no.notna()].copy()
 
@@ -1242,6 +1224,12 @@ async def seq_docket(core_args, query_results, docket_input, docket_update, show
                 logging.info(f"{DktS}: case limit ({DktS.case_limit}) reached")
                 break
 
+            # check if cost_limit reached
+            nonlocal total_cost # i've never used this before! feels ugly...but...it must've been built in for a reason
+            if DktS.cost_limit and total_cost >= DktS.cost_limit:
+                logging.info(f"{DktS}: cost limit ($%.2f) {'reached' if total_cost==DktS.cost_limit else 'exceeded'}" % DktS.cost_limit)
+                break
+
             # Get a case from the pile
             case = cases.pop(0)
             if case.get('download_attempts', 0) >= MAX_DOWNLOAD_ATTEMPTS:
@@ -1260,7 +1248,9 @@ async def seq_docket(core_args, query_results, docket_input, docket_update, show
 
                 # Pass the previously_downloaded status in to pull_case
                 case['previously_downloaded'] = exists
-                docket_path = await DktS.pull_case(case, new_member_list_seen)
+                docket_path, cost = await DktS.pull_case(case, new_member_list_seen)
+                total_cost += cost
+
 
                 if docket_path==PACER_ERROR_WRONG_CASE:
                     logging.info(f"{DktS} PACER_ERROR_WRONG_CASE: served wrong case, pushing back onto end of queue")
@@ -1285,7 +1275,7 @@ async def seq_docket(core_args, query_results, docket_input, docket_update, show
     logging.info(f"\n######\n## Docket Scraper Sequence [{core_args['court']}]\n######\n")
 
     # Handle all of parsing for varied docket_input possibilites
-    input_data = stools.parse_docket_input(query_results, docket_input, core_args['case_type'], core_args['court'])
+    input_data = stools.parse_docket_input(query_results, docket_input, core_args['case_type'], core_args['court'], logging)
 
     if not len(input_data):
         logging.info('No input data, ending session')
@@ -1309,12 +1299,6 @@ async def seq_docket(core_args, query_results, docket_input, docket_update, show
         exclude_df = get_excluded_cases(core_args['exclusions_path'], core_args['court'])
         df_cases = df_cases[~df_cases.ucid.isin(exclude_df.ucid)].copy()
 
-    # REMOVING THIS STEP: moving the previously downloaded check inside of the loop
-    # Check which cases are downloaded
-    # df_down = get_downloaded_cases(core_args['court_dir'])[['ucid', 'fpath']]
-    # df_cases = df_cases.merge(df_down, how='left', left_on='ucid', right_on='ucid')
-    # df_cases['previously_downloaded'] = df_cases['fpath'].notna()
-
     # Check update task file
     if docket_update:
         # Drop any that have already been completed in this task
@@ -1336,19 +1320,17 @@ async def seq_docket(core_args, query_results, docket_input, docket_update, show
         df_cases.latest_date.fillna('', inplace=True)
 
         keepcols = [col for col in ('case_no', 'ucid', 'latest_date', 'def_no') if col in df_cases.columns ]
-        cases = df_cases[keepcols].to_dict('records')
     else:
-        # logging.info(f"Removing previously downloaded cases...")
         keepcols = [col for col in ('case_no', 'ucid', 'def_no') if col in df_cases.columns ]
-        cases = df_cases[keepcols].to_dict('records')
-
+        
+    cases = df_cases[keepcols].to_dict('records')
     del df_cases, input_data
-
     # logging.info(f"Docket Scraper initialised with {len(cases):,} cases.")
 
-    # Initilise lists, will be accessed by all instances of _scraper_
+    # Initialise lists, will be accessed by all instances of _scraper_
     results = {'success': [], 'failure':[], 'skipped':[]}
     new_member_list_seen = []
+    total_cost = 0
 
     # Initialise scrapers, run asynchronously
     scrapers = [asyncio.create_task(_scraper_(args=core_args, ind=i)) for i in range(core_args['n_workers'])]
@@ -1358,10 +1340,12 @@ async def seq_docket(core_args, query_results, docket_input, docket_update, show
     logging.info(f'\nDocket Scraper sequence terminated successfully')
     results_tally = {k: f"{len(v):,}" for k,v in results.items()}
     logging.info(str(results_tally))
+    logging.info(f'Total cost: $%.2f' % total_cost)
 
 
     # When finished scraping, add new_member_list_seen to the member_list file
     if len(new_member_list_seen):
+        new_member_list_seen=list(set(new_member_list_seen)) #covering greg's bases (even if I missed something, this much redundancy can't hurt)
         with open(settings.MEM_DF, 'a', encoding='utf-8', newline='\n') as wfile:
             rows = ( (core_args['court'], x) for x in new_member_list_seen)
             csv.writer(wfile).writerows(rows)
@@ -1423,7 +1407,8 @@ async def seq_summary(core_args, summary_input):
         query_results=[],
         docket_input=summary_input,
         case_type=core_args['case_type'],
-        court=core_args['court']
+        court=core_args['court'],
+        logging=logging
         )
     logging.info(f"Built case list of length: {len(input_data):,}")
 
@@ -1431,12 +1416,6 @@ async def seq_summary(core_args, summary_input):
     df_cases = pd.DataFrame(input_data)
     df_cases['ucid'] = dtools.ucid(core_args['court'], df_cases['case_no'])
 
-    # # Check which cases are downloaded
-    # df_down = get_downloaded_cases(core_args['court_dir'], summaries=True)[['ucid', 'fpath']]
-    # df_cases = df_cases.merge(df_down, how='left', left_on='ucid', right_on='ucid')
-    # df_cases['previously_downloaded'] = df_cases['fpath'].notna()
-    #
-    # logging.info(f"Removing previously downloaded cases...")
     keepcols = [col for col in ('case_no', 'ucid', 'def_no') if col in df_cases.columns ]
     cases = df_cases[keepcols].to_dict('records')
 
@@ -1602,6 +1581,7 @@ async def seq_document(core_args, new_dockets, document_input, document_att, ski
                help="RunTime End hour (in 24hrs, CDT)", type=click.IntRange(0, 23))
 @click.option('--case-limit','-cl', default=None,
                help='Sets limit on no. of cases to process, enter "false" for no limit')
+@click.option('--cost-limit', type=float, default=None)
 @click.option('--headless', '-h', default=False, is_flag=True,
                help='Runs selenium in headless mode if true')
 @click.option('--verbose', '-v', default=False, is_flag=True,
@@ -1648,7 +1628,7 @@ async def seq_document(core_args, new_dockets, document_input, document_att, ski
                help="Document Scraper: Skip seen cases, ignore any cases where we have previously downloaded any documents")
 @click.option('--document-limit', default=DOCKET_ROW_DOCS_LIMIT, show_default=True,
                help="Document Scraper: skip cases that have more documents than document_limit")
-def main(inpath, mode, n_workers, court, case_type, auth_path, override_time, runtime_start, runtime_end, case_limit, headless, verbose, slabels,
+def main(inpath, mode, n_workers, court, case_type, auth_path, override_time, runtime_start, runtime_end, case_limit, cost_limit, headless, verbose, slabels,
          query_conf, query_prefix,
          docket_input, docket_mem_list, docket_exclusions, docket_update, docket_exclude_parties,
          summary_input,
@@ -1690,6 +1670,7 @@ def main(inpath, mode, n_workers, court, case_type, auth_path, override_time, ru
         'case_type': case_type,
         'auth_path': auth_path,
         'case_limit': case_limit,
+        'cost_limit': cost_limit,
         'time_restriction': time_restriction,
         'rts': runtime_start,
         'rte': runtime_end,
