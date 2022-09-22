@@ -95,6 +95,9 @@ def login(browser, auth, login_url=None, logging=None):
     '''
     if login_url:
         browser.get(login_url)
+        # silly pacer demo-site workaround
+        if browser.current_url != login_url:
+            browser.get(login_url)
 
     # Check if already logged in
     if is_logged_in(browser):
