@@ -11,6 +11,7 @@ import pytz
 import pandas as pd
 from pandas import to_datetime
 from selenium.webdriver import FirefoxOptions
+from selenium.webdriver.common.by import By
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from downloader import forms
@@ -353,11 +354,11 @@ def is_logged_in(browser):
     ''' Check if logged in to pacer, returns true if logout is in the navbar'''
 
     # Check if the navbar is there
-    nav = browser.find_elements_by_css_selector('#topmenu')
+    nav = browser.find_elements(By.CSS_SELECTOR, '#topmenu')
     if not len(nav):
         return None
     # Get all the links
-    nav_links = nav[0].find_elements_by_css_selector('a')
+    nav_links = nav[0].find_elements(By.CSS_SELECTOR, 'a')
     # Clean the link text and return true if logout is in
     return 'logout' in [link.text.lower().replace(' ','').strip() for link in nav_links]
 
