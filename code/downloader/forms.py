@@ -283,16 +283,16 @@ def locator(css_selector, browser, get_many=False):
     if type(css_selector) is list:
         for sel in css_selector:
             try:
-                return browser.find_element_by_css_selector(sel)
+                return browser.find_element(By.CSS_SELECTOR, sel)
             except:
                 continue
         return
 
     if get_many:
-        return browser.find_elements_by_css_selector(css_selector)
+        return browser.find_elements(By.CSS_SELECTOR, css_selector)
     else:
         try:
-            return browser.find_element_by_css_selector(css_selector)
+            return browser.find_element(By.CSS_SELECTOR, css_selector)
         except:
             return
 
@@ -313,7 +313,7 @@ def case_no_pre_submit(form):
         # If the case selector appears, choose the first case (the main case)
         elif form.browser.find_element_by_id('case_number_pick_area_0').is_displayed():
             # Check if any checkbox ticked
-            docket_checkboxes = form.browser.find_elements_by_css_selector('#case_number_pick_area_0 input[type="checkbox"]')
+            docket_checkboxes = form.browser.find_elements(By.CSS_SELECTOR, '#case_number_pick_area_0 input[type="checkbox"]')
             if not any(box.is_selected() for box in docket_checkboxes):
                 # Click the first if none pre-selected (default to main)
                 docket_checkboxes[0].click()
