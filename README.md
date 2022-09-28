@@ -123,7 +123,7 @@ This short section explains how to use the SCALES Parser tool to read HTMLs down
 **Running script**
 To use the parser on the HTMLs from the docket scraper in the previous tutorial, we will simply run the following:
 
-    python parse_pacer.py ../../data/pacer/psc/html ../../data/pacer/psc/json
+    python parse_pacer.py ../../data/pacer/psc/html
 
 **Result**
 Once the parser has finished, all the parsed versions of the HTML files can be found in */data/pacer/psc/json*.
