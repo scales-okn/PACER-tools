@@ -1018,9 +1018,9 @@ def parse(input_dir, output_dir, summaries_dir, court=None, all_courts=False, de
                 help='Name of file to log parsed in /parsers/log/{log-parsed} as csv with columns ucid, fpath')
 @click.option('--recap-file', default=None, show_default=True,
                 help='Path to csv with recap cases, with columns for ucid and fpath (relative path to recap file)')
-def main(**kwargs ):
+def parser(**kwargs ):
     ''' Parses .html casefiles in INPUT_DIR and puts .json files into the output directory'''
     parse(**kwargs)
 
 if __name__ == '__main__':
-    main()
+    parser()

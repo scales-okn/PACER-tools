@@ -611,7 +611,10 @@ class DocketScraper(CoreScraper):
             time.sleep(PAUSE['micro'])
             download_url = self.browser.current_url
             page_source = self.browser.page_source
-            cost = float(ftools.parse_transaction_history(page_source)['cost'])
+            if self.court == 'psc':
+                cost = 0
+            else:
+                cost = float(ftools.parse_transaction_history(page_source)['cost'])
 
             # Make sure parent directory exists, which will be the year-part
             outpath.parent.mkdir(exist_ok=True, mode=0o775)
@@ -1628,7 +1631,7 @@ async def seq_document(core_args, new_dockets, document_input, document_att, ski
                help="Document Scraper: Skip seen cases, ignore any cases where we have previously downloaded any documents")
 @click.option('--document-limit', default=DOCKET_ROW_DOCS_LIMIT, show_default=True,
                help="Document Scraper: skip cases that have more documents than document_limit")
-def main(inpath, mode, n_workers, court, case_type, auth_path, override_time, runtime_start, runtime_end, case_limit, cost_limit, headless, verbose, slabels,
+def scraper(inpath, mode, n_workers, court, case_type, auth_path, override_time, runtime_start, runtime_end, case_limit, cost_limit, headless, verbose, slabels,
          query_conf, query_prefix,
          docket_input, docket_mem_list, docket_exclusions, docket_update, docket_exclude_parties,
          summary_input,
@@ -1706,7 +1709,7 @@ def main(inpath, mode, n_workers, court, case_type, auth_path, override_time, ru
     # Docket Scraper run sequence
     if run_module['docket']:
         if not docket_input:
-            raise ValueError('Must supply a --document-input for the document scraper')
+            raise ValueError('Must supply a --docket-input for the docket scraper')
         else:
             docket_input = Path(docket_input).resolve()
 
@@ -1750,4 +1753,4 @@ def main(inpath, mode, n_workers, court, case_type, auth_path, override_time, ru
     print(f'Scrape terminated, log file available at: {logpath}')
 
 if __name__ == '__main__':
-    main()
+    scraper()

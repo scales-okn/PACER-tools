@@ -311,7 +311,7 @@ def case_no_pre_submit(form):
         if run_button.is_enabled():
             break
         # If the case selector appears, choose the first case (the main case)
-        elif form.browser.find_element_by_id('case_number_pick_area_0').is_displayed():
+        elif form.browser.find_element(By.ID, 'case_number_pick_area_0').is_displayed():
             # Check if any checkbox ticked
             docket_checkboxes = form.browser.find_elements(By.CSS_SELECTOR, '#case_number_pick_area_0 input[type="checkbox"]')
             if not any(box.is_selected() for box in docket_checkboxes):
