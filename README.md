@@ -96,10 +96,9 @@ Lastly, we will get the actual documents associated with docket lines of the cas
 **Running script**
 To use the Document Scraper we run the following:
 
-    pacer-tools scraper -m document -c psc -a demo/auth.json -cl 50 --override-time --document-input demo/document_input.csv --document-all-docs demo/pacer/psc
+    pacer-tools scraper -m document -c psc -a demo/auth.json -cl 50 --override-time --document-input demo/document_input.csv demo/pacer/psc
     
  - There is a default limit of 1000 documents per case. Any case that has more than 1000 documents will be skipped. This limit can be changed by the  `--document-limit` option.
- - The `--document-all-docs` will download all documents from a case, see the detailed scraper documentation below to download specific documents from a case.
 
 **Result**
 The Document Scraper will usually take significantly longer to run than the Docket Scraper given the volume of documents in most cases. Once the documents have finished downloading they can be found in the *demo/pacer/psc/docs* folder.
