@@ -1,2 +1,0 @@
-[console_scripts]
-pacer-tools = pacer_tools:cli

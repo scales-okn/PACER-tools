@@ -932,7 +932,6 @@ class DocumentScraper(CoreScraper):
                 self.close_browser()
                 raise ValueError('Cannot log in to PACER')
 
-
         ucid = docket['ucid']
         fpath = ftools.get_expected_path(ucid, subdir='html', pacer_path=self.dir.root.parent,)
         case_no = ftools.clean_case_id(fpath.stem)
@@ -940,6 +939,8 @@ class DocumentScraper(CoreScraper):
         # Get all the document links for this file
         soup = BeautifulSoup( open(fpath).read(), "html.parser")
         docket_table = soup.select('table')[-2]
+        if self.court == 'psc':
+            docket_table = soup.select('table')[-1]
         if not re.match('^\s?Date Filed.*', docket_table.text):
             return
 

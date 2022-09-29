@@ -3,7 +3,7 @@ from glob import glob
 
 setup(
 	name='pacer-tools',
-	version='0.1.2',
+	version='0.1.3',
 	package_dir={'': 'src'},
 	packages=find_packages('src'),
 	install_requires=[
@@ -27,6 +27,9 @@ setup(
 			'pacer-tools = pacer_tools:cli',
 		],
 	},
-    data_files=[('pacer_tools', glob('src/pacer_tools/code/support/core_data/*'))],
+    data_files=[
+        ('pacer_tools', glob('src/pacer_tools/code/support/core_data/*')),
+        ('pacer_tools', glob('src/pacer_tools/data/annotation/*'))
+    ],
     include_package_data = True,
 )
