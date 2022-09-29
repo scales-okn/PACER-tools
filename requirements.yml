@@ -1,0 +1,43 @@
+# Create this environment using `conda env create -f <this file>`
+# Update this enviroment by activating it and then `conda env update -f <this file>`
+name: scales_env
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.8.*
+  - pandas=1.3.*
+  - spacy=3.2.*
+  - scikit-learn
+  - statsmodels
+  - ipython
+  - scipy
+  - seaborn
+  - click
+  - numpy
+  - tqdm
+  - selenium
+  - selenium-requests
+  - simplejson
+  - xlrd
+  - lxml
+  - bs4
+  - spacy-lookups-data
+  - psycopg2
+  - sqlalchemy
+  - python-dotenv
+  - xmltodict
+  - pymongo
+  - rdflib
+  - fuzzywuzzy
+  - toolz
+  - pip
+  - pip:
+      - usaddress
+      - anyio
+      - asyncclick
+      - flashtext
+  # - psycopg2-binary
+  # - cenpy
+  # - html5lib
+  # - geopandas
