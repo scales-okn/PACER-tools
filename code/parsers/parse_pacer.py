@@ -877,11 +877,9 @@ def case_runner(case, output_dir, court, debug, force_rerun, count, member_df, l
     '''
     Case parser management
     '''
-    # Get the output path (??? seems like it's trying to make sure to use the new get_expected_path)
+    # Get the output path
     case_fname = Path(case['docket_paths'][0]).stem
-    pacer_dir = Path(output_dir).resolve().parent.parent
-    outname = ftools.get_expected_path(ucid=case['ucid'], pacer_path=pacer_dir)
-    # outname = Path(output_dir) / f"{case_fname}.json"
+    outname = ftools.get_expected_path(ucid=case['ucid'], manual_subdir_path=output_dir)
 
     if force_rerun or not outname.exists(): # Check whether the output file exists already
         case_data = process_html_file(case, member_df, court = court)
@@ -999,7 +997,7 @@ def parse(input_dir, output_dir, summaries_dir, court=None, all_courts=False, de
 @click.command()
 @click.argument('input-dir')
 @click.option('--output-dir', '-o', default=None, type=click.Path(exists=True, file_okay=False),
-                help="Directory to place parsed output, if none provided defaults to INPUT_DIR/json ")
+                help="Directory to place parsed output, if none provided defaults to INPUT_DIR/../json ")
 @click.option('--summaries-dir', '-s', default=None, type=click.Path(exists=True, file_okay=False),
                 help="Directory to place parsed output, if none provided defaults to INPUT_DIR/summaries ")
 @click.option('--court', '-c', default=None,
@@ -1024,3 +1022,4 @@ def parser(**kwargs ):
 
 if __name__ == '__main__':
     parser()
+

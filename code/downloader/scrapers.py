@@ -612,7 +612,7 @@ class DocketScraper(CoreScraper):
             download_url = self.browser.current_url
             page_source = self.browser.page_source
             if self.court == 'psc':
-                cost = 0
+                cost = 0 
             else:
                 cost = float(ftools.parse_transaction_history(page_source)['cost'])
 

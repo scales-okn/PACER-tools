@@ -573,13 +573,14 @@ def _get_expected_path_old_(ucid, subdir='json', pacer_path=settings.PACER_PATH,
 
     return pacer_path / court / subdir / fname
 
-def get_expected_path(ucid, subdir='json', pacer_path=settings.PACER_PATH, def_no=None, update_ind=None):
+def get_expected_path(ucid, subdir='json', manual_subdir_path=None, pacer_path=settings.PACER_PATH, def_no=None, update_ind=None):
     '''
     Find the expected path of case-level data files
 
     Inputs:
         - ucid (str): case ucid
         - subdir (str): the subdirectory to look in (see scrapers.PacerCourtDir), one of 'html', 'json', 'docs', 'summaries', 'members'
+        - manual_subdir_path (str): (mainly for parser) the directory in which to locate the expected path, rather than pacer_path/court/subdir
         - pacer_path (Path): path to pacer data directory
         - def_no (str or int): the defendant no., if specifying a defendant-specific docket
         - update_ind (int): update index (for html files), passed through to generate_docket_filename
@@ -591,11 +592,15 @@ def get_expected_path(ucid, subdir='json', pacer_path=settings.PACER_PATH, def_n
     court, case_no = ucid_data['court'], ucid_data['case_no']
     year_part = decompose_caseno(case_no)['year']
 
-    # Build the filepath
+    # Build the filename
     ext = SUBDIR_EXTENSIONS[subdir]
     fname = generate_docket_filename(case_no, ext=ext, def_no=def_no, ind=update_ind)
 
-    return pacer_path / court / subdir / year_part / fname
+    # Build the full filepath
+    if manual_subdir_path:
+        return Path(manual_subdir_path).resolve() / year_part / fname
+    else:
+        return pacer_path / court / subdir / year_part / fname
 
 def filename_to_ucid(fname, court):
     fpath = Path(fname)
