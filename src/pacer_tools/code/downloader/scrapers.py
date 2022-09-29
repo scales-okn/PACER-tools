@@ -940,6 +940,8 @@ class DocumentScraper(CoreScraper):
         # Get all the document links for this file
         soup = BeautifulSoup( open(fpath).read(), "html.parser")
         docket_table = soup.select('table')[-2]
+        if self.court == 'psc':
+            docket_table = soup.select('table')[-1]
         if not re.match('^\s?Date Filed.*', docket_table.text):
             return
 
