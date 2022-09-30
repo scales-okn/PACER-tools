@@ -1641,6 +1641,7 @@ def scraper(inpath, mode, n_workers, court, case_type, auth_path, override_time,
          document_input, document_att, document_skip_seen, document_limit, document_all_docs):
     ''' Handles arguments/options, the run sequence of the 3 modules'''
 
+    Path(settings.LOG_DIR).mkdir(exist_ok=True)
     time_str = stools.get_time_central(as_string=True).replace(':','-')
     logpath = Path(settings.LOG_DIR) / f"log_{time_str}.txt"
     logging.basicConfig(level=logging.INFO, filename=logpath, filemode='w')
