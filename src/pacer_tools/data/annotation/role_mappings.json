@@ -1,0 +1,1438 @@
+{
+	"Accountant": {
+		"title": "Accountant",
+		"type": "misc"
+	},
+	"ADR Limited Scope Counsel": {
+		"title": "ADR Limited Scope Counsel",
+		"type": "misc"
+	},
+	"Adr Limited Scope Counsel": {
+		"title": "ADR Limited Scope Counsel",
+		"type": "misc"
+	},
+	"ADR Provider": {
+		"title": "ADR Provider",
+		"type": "misc"
+	},
+	"Adr Provider": {
+		"title": "ADR Provider",
+		"type": "misc"
+	},
+	"All Defendants": {
+		"title": "All Defendants",
+		"type": "defendant"
+	},
+	"All Plaintiffs": {
+		"title": "All Plaintiffs",
+		"type": "plaintiff"
+	},
+	"Amicus": {
+		"title": "Amicus",
+		"type": "other_party"
+	},
+	"amicus": {
+		"title": "Amicus",
+		"type": "other_party"
+	},
+	"Appellant": {
+		"title": "Appellant",
+		"type": "plaintiff"
+	},
+	"Appellee": {
+		"title": "Appellee",
+		"type": "defendant"
+	},
+	"Applicant": {
+		"title": "Applicant",
+		"type": "plaintiff"
+	},
+	"Apportionment Defendant": {
+		"title": "Apportionment Defendant",
+		"type": "defendant"
+	},
+	"Appraiser": {
+		"title": "Appraiser",
+		"type": "bk_party"
+	},
+	"Arbitrator": {
+		"title": "Arbitrator",
+		"type": "other_party"
+	},
+	"Assistant US Trustee": {
+		"title": "Assistant U.S. Trustee",
+		"type": "bk_party"
+	},
+	"Assistant U.S. Trustee": {
+		"title": "Assistant U.S. Trustee",
+		"type": "bk_party"
+	},
+	"Attorney": {
+		"title": "Attorney",
+		"type": "misc"
+	},
+	"Attorney/Guardian Ad Litem": {
+		"title": "Attorney/Guardian Ad Litem",
+		"type": "other_party"
+	},
+	"Attorney/Guardian ad litem": {
+		"title": "Attorney/Guardian Ad Litem",
+		"type": "other_party"
+	},
+	"Auctioneer": {
+		"title": "Auctioneer",
+		"type": "bk_party"
+	},
+	"Auditor": {
+		"title": "Auditor",
+		"type": "misc"
+	},
+	"Bankruptcy Judge": {
+		"title": "Bankruptcy Judge",
+		"type": "bk_party"
+	},
+	"BK Notice Party": {
+		"title": "BK Notice Party",
+		"type": "bk_party"
+	},
+	"Broker": {
+		"title": "Broker",
+		"type": "misc"
+	},
+	"Carrier": {
+		"title": "Carrier",
+		"type": "other_party"
+	},
+	"Case Evaluator": {
+		"title": "Case Evaluator",
+		"type": "other_party"
+	},
+	"case evaluator": {
+		"title": "Case Evaluator",
+		"type": "other_party"
+	},
+	"Case Evaluator Chair": {
+		"title": "Case Evaluator Chair",
+		"type": "other_party"
+	},
+	"case evaluator chair": {
+		"title": "Case Evaluator Chair",
+		"type": "other_party"
+	},
+	"Claimant": {
+		"title": "Claimant",
+		"type": "plaintiff"
+	},
+	"claimant": {
+		"title": "Claimant",
+		"type": "plaintiff"
+	},
+	"Claimant Consolidated": {
+		"title": "Consolidated Claimant",
+		"type": "plaintiff"
+	},
+	"Conservator": {
+		"title": "Conservator",
+		"type": "other_party"
+	},
+	"Consol Appellant": {
+		"title": "Consolidated Appellant",
+		"type": "plaintiff"
+	},
+	"Consol Appellee": {
+		"title": "Consolidated Appellee",
+		"type": "defendant"
+	},
+	"Consol Claimant": {
+		"title": "Consolidated Claimant",
+		"type": "plaintiff"
+	},
+	"Consol Counter Claimant": {
+		"title": "Consolidated Counter Claimant",
+		"type": "other_party"
+	},
+	"Consol Counter Defendant": {
+		"title": "Consolidated Counter Defendant",
+		"type": "other_party"
+	},
+	"Consol Counter Plaintiff": {
+		"title": "Consolidated Counter Plaintiff",
+		"type": "other_party"
+	},
+	"Consol Cross Claimant": {
+		"title": "Consolidated Cross Claimant",
+		"type": "other_party"
+	},
+	"Consol Cross Defendant": {
+		"title": "Consolidated Cross Defendant",
+		"type": "other_party"
+	},
+	"Consol Defendant": {
+		"title": "Consolidated Defendant",
+		"type": "defendant"
+	},
+	"Consol Interested Plaintiff": {
+		"title": "Consolidated Interested Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consol Interested Pltf": {
+		"title": "Consolidated Interested Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consol Intervenor Defendant": {
+		"title": "Consolidated Intervenor Defendant",
+		"type": "defendant"
+	},
+	"Consol Intervenor Plaintiff": {
+		"title": "Consolidated Intervenor Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consol Petitioner": {
+		"title": "Consolidated Petitioner",
+		"type": "plaintiff"
+	},
+	"Consol Plaintiff": {
+		"title": "Consolidated Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consol Third Party": {
+		"title": "Consolidated Third Party",
+		"type": "other_party"
+	},
+	"Consol Third Party Defendant": {
+		"title": "Consolidated Third Party Defendant",
+		"type": "defendant"
+	},
+	"Consol Third Party Plaintiff": {
+		"title": "Consolidated Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consol ThirdParty": {
+		"title": "Consolidated Third Party",
+		"type": "other_party"
+	},
+	"Consol ThirdParty Defendant": {
+		"title": "Consolidated Third Party Defendant",
+		"type": "defendant"
+	},
+	"Consol ThirdParty Plaintiff": {
+		"title": "Consolidated Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consol 3rd Party": {
+		"title": "Consolidated Third Party",
+		"type": "other_party"
+	},
+	"Consol 3rd Party Defendant": {
+		"title": "Consolidated Third Party Defendant",
+		"type": "defendant"
+	},
+	"Consol 3rd Party Plaintiff": {
+		"title": "Consolidated Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consol 3rdParty": {
+		"title": "Consolidated Third Party",
+		"type": "other_party"
+	},
+	"Consol 3rdParty Defendant": {
+		"title": "Consolidated Third Party Defendant",
+		"type": "defendant"
+	},
+	"Consol 3rdParty Plaintiff": {
+		"title": "Consolidated Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consol X-Claimant": {
+		"title": "Consolidated Cross Claimant",
+		"type": "other_party"
+	},
+	"Consol X-Defendant": {
+		"title": "Consolidated Cross Defendant",
+		"type": "other_party"
+	},
+	"Consolidated Appellant": {
+		"title": "Consolidated Appellant",
+		"type": "plaintiff"
+	},
+	"Consolidated Appellee": {
+		"title": "Consolidated Appellee",
+		"type": "defendant"
+	},
+	"Consolidated Claimant": {
+		"title": "Consolidated Claimant",
+		"type": "plaintiff"
+	},
+	"Consolidated Counter Claimant": {
+		"title": "Consolidated Counter Claimant",
+		"type": "other_party"
+	},
+	"Consolidated Counter Defendant": {
+		"title": "Consolidated Counter Defendant",
+		"type": "other_party"
+	},
+	"Consolidated Cross Claimant": {
+		"title": "Consolidated Cross Claimant",
+		"type": "other_party"
+	},
+	"Consolidated Cross Defendant": {
+		"title": "Consolidated Cross Defendant",
+		"type": "other_party"
+	},
+	"Consolidated Defendant": {
+		"title": "Consolidated Defendant",
+		"type": "defendant"
+	},
+	"Consolidated Filer Defendant": {
+		"title": "Consolidated Filer Defendant",
+		"type": "defendant"
+	},
+	"Consolidated Filer Plaintiff": {
+		"title": "Consolidated Filer Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consolidated Petitioner": {
+		"title": "Consolidated Petitioner",
+		"type": "plaintiff"
+	},
+	"Consolidated Plaintiff": {
+		"title": "Consolidated Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consolidated Respondent": {
+		"title": "Consolidated Respondent",
+		"type": "defendant"
+	},
+	"Consolidated Third Party": {
+		"title": "Consolidated Third Party",
+		"type": "other_party"
+	},
+	"Consolidated Third Party Defendant": {
+		"title": "Consolidated Third Party Defendant",
+		"type": "defendant"
+	},
+	"Consolidated Third Party Plaintiff": {
+		"title": "Consolidated Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consolidated ThirdParty": {
+		"title": "Consolidated Third Party",
+		"type": "other_party"
+	},
+	"Consolidated ThirdParty Defendant": {
+		"title": "Consolidated Third Party Defendant",
+		"type": "defendant"
+	},
+	"Consolidated ThirdParty Plaintiff": {
+		"title": "Consolidated Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consolidated 3rd Party": {
+		"title": "Consolidated Third Party",
+		"type": "other_party"
+	},
+	"Consolidated 3rd Party Defendant": {
+		"title": "Consolidated Third Party Defendant",
+		"type": "defendant"
+	},
+	"Consolidated 3rd Party Plaintiff": {
+		"title": "Consolidated Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consolidated 3rdParty": {
+		"title": "Consolidated Third Party",
+		"type": "other_party"
+	},
+	"Consolidated 3rdParty Defendant": {
+		"title": "Consolidated Third Party Defendant",
+		"type": "defendant"
+	},
+	"Consolidated 3rdParty Plaintiff": {
+		"title": "Consolidated Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Consolidated X-Claimant": {
+		"title": "Consolidated Cross Claimant",
+		"type": "other_party"
+	},
+	"Consolidated X-Defendant": {
+		"title": "Consolidated Cross Defendant",
+		"type": "other_party"
+	},
+	"Consultant": {
+		"title": "Consultant",
+		"type": "misc"
+	},
+	"Consumer Privacy": {
+		"title": "Consumer Privacy",
+		"type": "misc"
+	},
+	"Coordinating Discovery Attorney": {
+		"title": "Coordinating Discovery Attorney",
+		"type": "other_party"
+	},
+	"Counter Claimant": {
+		"title": "Counter Claimant",
+		"type": "other_party"
+	},
+	"Counter-Claimant": {
+		"title": "Counter Claimant",
+		"type": "other_party"
+	},
+	"Counter-claimant": {
+		"title": "Counter Claimant",
+		"type": "other_party"
+	},
+	"counter-claimant": {
+		"title": "Counter Claimant",
+		"type": "other_party"
+	},
+	"Counter Claimant Consolidated": {
+		"title": "Consolidated Counter Claimant",
+		"type": "other_party"
+	},
+	"Counter Defendant": {
+		"title": "Counter Defendant",
+		"type": "other_party"
+	},
+	"Counter-Defendant": {
+		"title": "Counter Defendant",
+		"type": "other_party"
+	},
+	"Counter-defendant": {
+		"title": "Counter Defendant",
+		"type": "other_party"
+	},
+	"counter-defendant": {
+		"title": "Counter Defendant",
+		"type": "other_party"
+	},
+	"Counter Defendant Consolidated": {
+		"title": "Consolidated Counter Defendant",
+		"type": "other_party"
+	},
+	"Counter Plaintiff": {
+		"title": "Counter Plaintiff",
+		"type": "other_party"
+	},
+	"Counter-Plaintiff": {
+		"title": "Counter Plaintiff",
+		"type": "other_party"
+	},
+	"Counter-plaintiff": {
+		"title": "Counter Plaintiff",
+		"type": "other_party"
+	},
+	"counter-plaintiff": {
+		"title": "Counter Plaintiff",
+		"type": "other_party"
+	},
+	"Counterclaim Defendant": {
+		"title": "Counterclaim Defendant",
+		"type": "defendant"
+	},
+	"Counterclaim Plaintiff": {
+		"title": "Counterclaim Plaintiff",
+		"type": "plaintiff"
+	},
+	"Court Monitor": {
+		"title": "Court Monitor",
+		"type": "misc"
+	},
+	"Creditor": {
+		"title": "Creditor",
+		"type": "other_party"
+	},
+	"Creditor Committee": {
+		"title": "Creditor Committee",
+		"type": "misc"
+	},
+	"Creditor Committee Chair": {
+		"title": "Creditor Committee Chair",
+		"type": "misc"
+	},
+	"Cross Appellant": {
+		"title": "Cross Appellant",
+		"type": "other_party"
+	},
+	"Cross-Appellant": {
+		"title": "Cross Appellant",
+		"type": "other_party"
+	},
+	"Cross Appellee": {
+		"title": "Cross Appellee",
+		"type": "other_party"
+	},
+	"Cross-Appellee": {
+		"title": "Cross Appellee",
+		"type": "other_party"
+	},
+	"Cross Claimant": {
+		"title": "Cross Claimant",
+		"type": "other_party"
+	},
+	"Cross-Claimant": {
+		"title": "Cross Claimant",
+		"type": "other_party"
+	},
+	"Cross-claimant": {
+		"title": "Cross Claimant",
+		"type": "other_party"
+	},
+	"cross-claimant": {
+		"title": "Cross Claimant",
+		"type": "other_party"
+	},
+	"Cross Claimant Consolidated": {
+		"title": "Consolidated Cross Claimant",
+		"type": "other_party"
+	},
+	"Cross Defendant": {
+		"title": "Cross Defendant",
+		"type": "other_party"
+	},
+	"Cross-Defendant": {
+		"title": "Cross Defendant",
+		"type": "other_party"
+	},
+	"Cross-defendant": {
+		"title": "Cross Defendant",
+		"type": "other_party"
+	},
+	"cross-defendant": {
+		"title": "Cross Defendant",
+		"type": "other_party"
+	},
+	"Cross Plaintiff": {
+		"title": "Cross Plaintiff",
+		"type": "other_party"
+	},
+	"Cross-Plaintiff": {
+		"title": "Cross Plaintiff",
+		"type": "other_party"
+	},
+	"Cross-plaintiff": {
+		"title": "Cross Plaintiff",
+		"type": "other_party"
+	},
+	"cross-plaintiff": {
+		"title": "Cross Plaintiff",
+		"type": "other_party"
+	},
+	"Custodian": {
+		"title": "Custodian",
+		"type": "other_party"
+	},
+	"Debtor": {
+		"title": "Debtor",
+		"type": "bk_party"
+	},
+	"debtor": {
+		"title": "Debtor",
+		"type": "bk_party"
+	},
+	"Debtor In Possession": {
+		"title": "Debtor in Possession",
+		"type": "bk_party"
+	},
+	"Debtor in Possession": {
+		"title": "Debtor in Possession",
+		"type": "bk_party"
+	},
+	"Debtor-In-Possess": {
+		"title": "Debtor in Possession",
+		"type": "bk_party"
+	},
+	"Debtor-in-Possess": {
+		"title": "Debtor in Possession",
+		"type": "bk_party"
+	},
+	"Defaulted Defendant": {
+		"title": "Defaulted Defendant",
+		"type": "defendant"
+	},
+	"Defaulted Party": {
+		"title": "Defaulted Party",
+		"type": "other_party"
+	},
+	"Defendant": {
+		"title": "Defendant",
+		"type": "defendant"
+	},
+	"defendant": {
+		"title": "Defendant",
+		"type": "defendant"
+	},
+	"Defendant/Appellant": {
+		"title": "Defendant/Appellant",
+		"type": "other_party"
+	},
+	"Defendant/Appellee": {
+		"title": "Defendant/Appellee",
+		"type": "defendant"
+	},
+	"Defendant/Intervenor": {
+		"title": "Defendant/Intervenor",
+		"type": "other_party"
+	},
+	"Defendant - Consolidated": {
+		"title": "Consolidated Defendant",
+		"type": "defendant"
+	},
+	"Defendant - Defaulted": {
+		"title": "Defaulted Defendant",
+		"type": "defendant"
+	},
+	"Defendant - Estate": {
+		"title": "Estate Defendant",
+		"type": "defendant"
+	},
+	"Defendant-In-Rem": {
+		"title": "Defendant-in-Rem",
+		"type": "defendant"
+	},
+	"Defendant-in-Rem": {
+		"title": "Defendant-in-Rem",
+		"type": "defendant"
+	},
+	"Defendant Consolidated": {
+		"title": "Consolidated Defendant",
+		"type": "defendant"
+	},
+	"Defendant, Counter Plaintiff": {
+		"title": "Defendant/Counter Plaintiff",
+		"type": "defendant"
+	},
+	"Deponent": {
+		"title": "Deponent",
+		"type": "other_party"
+	},
+	"deponent": {
+		"title": "Deponent",
+		"type": "other_party"
+	},
+	"Disinterested Person": {
+		"title": "Disinterested Person",
+		"type": "misc"
+	},
+	"disinterested person": {
+		"title": "Disinterested Person",
+		"type": "misc"
+	},
+	"E-filing Institution": {
+		"title": "E-Filing Institution",
+		"type": "misc"
+	},
+	"ENE Evaluator": {
+		"title": "ENE Evaluator",
+		"type": "misc"
+	},
+	"Ene Evaluator": {
+		"title": "ENE Evaluator",
+		"type": "misc"
+	},
+	"Estate - Defendant": {
+		"title": "Estate Defendant",
+		"type": "defendant"
+	},
+	"Estate - Plaintiff": {
+		"title": "Estate Plaintiff",
+		"type": "plaintiff"
+	},
+	"Estate-Defendant": {
+		"title": "Estate Defendant",
+		"type": "defendant"
+	},
+	"Estate-Plaintiff": {
+		"title": "Estate Plaintiff",
+		"type": "plaintiff"
+	},
+	"Estate Defendant": {
+		"title": "Estate Defendant",
+		"type": "defendant"
+	},
+	"Estate of": {
+		"title": "Estate of",
+		"type": "other_party"
+	},
+	"Estate Plaintiff": {
+		"title": "Estate Plaintiff",
+		"type": "plaintiff"
+	},
+	"Examiner": {
+		"title": "Examiner",
+		"type": "misc"
+	},
+	"Executor Defendant": {
+		"title": "Executor Defendant",
+		"type": "defendant"
+	},
+	"Executor-Defendant": {
+		"title": "Executor Defendant",
+		"type": "defendant"
+	},
+	"Executor defendant": {
+		"title": "Executor Defendant",
+		"type": "defendant"
+	},
+	"executor defendant": {
+		"title": "Executor Defendant",
+		"type": "defendant"
+	},
+	"Executor Plaintiff": {
+		"title": "Executor Plaintiff",
+		"type": "plaintiff"
+	},
+	"Executor plaintiff": {
+		"title": "Executor Plaintiff",
+		"type": "plaintiff"
+	},
+	"executor plaintiff": {
+		"title": "Executor Plaintiff",
+		"type": "plaintiff"
+	},
+	"Expert": {
+		"title": "Expert",
+		"type": "misc"
+	},
+	"Ex Rel.": {
+		"title": "Ex Rel.",
+		"type": "other_party"
+	},
+	"Fifth Party Defendant": {
+		"title": "Fifth Party Defendant",
+		"type": "defendant"
+	},
+	"FifthParty Defendant": {
+		"title": "Fifth Party Defendant",
+		"type": "defendant"
+	},
+	"5th Party Defendant": {
+		"title": "Fifth Party Defendant",
+		"type": "defendant"
+	},
+	"Fifth Party Plaintiff": {
+		"title": "Fifth Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"FifthParty Plaintiff": {
+		"title": "Fifth Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"5th Party Plaintiff": {
+		"title": "Fifth Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Financial Advisor": {
+		"title": "Financial Advisor",
+		"type": "misc"
+	},
+	"Foreign Representative": {
+		"title": "Foreign Representative",
+		"type": "misc"
+	},
+	"Fourth Party Defendant": {
+		"title": "Fourth Party Defendant",
+		"type": "defendant"
+	},
+	"FourthParty Defendant": {
+		"title": "Fourth Party Defendant",
+		"type": "defendant"
+	},
+	"4th Party Defendant": {
+		"title": "Fourth Party Defendant",
+		"type": "defendant"
+	},
+	"Fourth Party Plaintiff": {
+		"title": "Fourth Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"FourthParty Plaintiff": {
+		"title": "Fourth Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"4th Party Plaintiff": {
+		"title": "Fourth Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Garnishee": {
+		"title": "Garnishee",
+		"type": "other_party"
+	},
+	"garnishee": {
+		"title": "Garnishee",
+		"type": "other_party"
+	},
+	"Guardian": {
+		"title": "Guardian",
+		"type": "other_party"
+	},
+	"Guardian Ad Litem": {
+		"title": "Guardian Ad Litem",
+		"type": "other_party"
+	},
+	"Guardian ad Litem": {
+		"title": "Guardian Ad Litem",
+		"type": "other_party"
+	},
+	"Guardian ad litem": {
+		"title": "Guardian Ad Litem",
+		"type": "other_party"
+	},
+	"Guardian Ad Litem Party": {
+		"title": "Guardian Ad Litem",
+		"type": "other_party"
+	},
+	"Guardian ad Litem Party": {
+		"title": "Guardian Ad Litem",
+		"type": "other_party"
+	},
+	"Guardian Ad Litem Plaintiff": {
+		"title": "Guardian Ad Litem Plaintiff",
+		"type": "plaintiff"
+	},
+	"Guardian ad Litem Plaintiff": {
+		"title": "Guardian Ad Litem Plaintiff",
+		"type": "plaintiff"
+	},
+	"HABEAS ATTORNEY GENERAL SERVICE LIST": {
+		"title": "Habeas Attorney General Service List",
+		"type": "misc"
+	},
+	"Habeas Attorney General Service List": {
+		"title": "Habeas Attorney General Service List",
+		"type": "misc"
+	},
+	"Health Care Ombudsman": {
+		"title": "Health Care Ombudsman",
+		"type": "misc"
+	},
+	"In Re": {
+		"title": "In Re",
+		"type": "misc"
+	},
+	"In Re:": {
+		"title": "In Re",
+		"type": "misc"
+	},
+	"In re Debtor": {
+		"title": "In Re Debtor",
+		"type": "other_party"
+	},
+	"Interested Non-Party": {
+		"title": "Interested Non-Party",
+		"type": "misc"
+	},
+	"Interested Party": {
+		"title": "Interested Party",
+		"type": "other_party"
+	},
+	"interested party": {
+		"title": "Interested Party",
+		"type": "other_party"
+	},
+	"Interim Trustee": {
+		"title": "Interim Trustee",
+		"type": "misc"
+	},
+	"Interpleader": {
+		"title": "Interpleader",
+		"type": "other_party"
+	},
+	"Interpleader Defendant": {
+		"title": "Interpleader Defendant",
+		"type": "defendant"
+	},
+	"Interpleader Plaintiff": {
+		"title": "Interpleader Plaintiff",
+		"type": "plaintiff"
+	},
+	"Interpreter": {
+		"title": "Interpreter",
+		"type": "other_party"
+	},
+	"Intervenor": {
+		"title": "Intervenor",
+		"type": "other_party"
+	},
+	"Intervenor Defendant": {
+		"title": "Intervenor Defendant",
+		"type": "defendant"
+	},
+	"Intervenor-Defendant": {
+		"title": "Intervenor Defendant",
+		"type": "defendant"
+	},
+	"Intervenor Dft": {
+		"title": "Intervenor Defendant",
+		"type": "defendant"
+	},
+	"Intervenor Petitioner": {
+		"title": "Intervenor Petitioner",
+		"type": "plaintiff"
+	},
+	"Intervenor Pla": {
+		"title": "Intervenor Plaintiff",
+		"type": "plaintiff"
+	},
+	"Intervenor Plaintiff": {
+		"title": "Intervenor Plaintiff",
+		"type": "plaintiff"
+	},
+	"Intervenor-Plaintiff": {
+		"title": "Intervenor Plaintiff",
+		"type": "plaintiff"
+	},
+	"Intervenor Respondent": {
+		"title": "Intervenor Respondent",
+		"type": "defendant"
+	},
+	"Involuntary Plaintiff": {
+		"title": "Involuntary Plaintiff",
+		"type": "plaintiff"
+	},
+	"Involuntary-Plaintiff": {
+		"title": "Involuntary Plaintiff",
+		"type": "plaintiff"
+	},
+	"involuntary-plaintiff": {
+		"title": "Involuntary Plaintiff",
+		"type": "plaintiff"
+	},
+	"Joint Debtor": {
+		"title": "Joint Debtor",
+		"type": "bk_party"
+	},
+	"Judge": {
+		"title": "Judge",
+		"type": "misc"
+	},
+	"Lead Defendant": {
+		"title": "Lead Defendant",
+		"type": "defendant"
+	},
+	"Lead Plaintiff": {
+		"title": "Lead Plaintiff",
+		"type": "plaintiff"
+	},
+	"Lead Plaintiffs": {
+		"title": "Lead Plaintiffs",
+		"type": "plaintiff"
+	},
+	"Liquidator": {
+		"title": "Liquidator",
+		"type": "bk_party"
+	},
+	"Master Commissioner": {
+		"title": "Master Commissioner",
+		"type": "other_party"
+	},
+	"Material Witness": {
+		"title": "Material Witness",
+		"type": "misc"
+	},
+	"material witness": {
+		"title": "Material Witness",
+		"type": "misc"
+	},
+	"Mediation Assistance Program Counsel": {
+		"title": "Mediation Assistance Program Counsel",
+		"type": "misc"
+	},
+	"Mediator": {
+		"title": "Mediator",
+		"type": "misc"
+	},
+	"mediator": {
+		"title": "Mediator",
+		"type": "misc"
+	},
+	"Miscellaneous": {
+		"title": "Miscellaneous Party",
+		"type": "other_party"
+	},
+	"Miscellaneous Party": {
+		"title": "Miscellaneous Party",
+		"type": "other_party"
+	},
+	"Monitor": {
+		"title": "Monitor",
+		"type": "other_party"
+	},
+	"Movant": {
+		"title": "Movant",
+		"type": "other_party"
+	},
+	"movant": {
+		"title": "Movant",
+		"type": "other_party"
+	},
+	"Neutral": {
+		"title": "Neutral",
+		"type": "other_party"
+	},
+	"Nominal Defendant": {
+		"title": "Nominal Defendant",
+		"type": "defendant"
+	},
+	"Non-Filing Spouse": {
+		"title": "Non-Filing Spouse",
+		"type": "misc"
+	},
+	"Non Filing Spouse": {
+		"title": "Non-Filing Spouse",
+		"type": "misc"
+	},
+	"NF Spouse": {
+		"title": "Non-Filing Spouse",
+		"type": "misc"
+	},
+	"Non-Party": {
+		"title": "Non-Party",
+		"type": "misc"
+	},
+	"Non Party": {
+		"title": "Non-Party",
+		"type": "misc"
+	},
+	"Non-Party Respondent": {
+		"title": "Non-Party Respondent",
+		"type": "misc"
+	},
+	"Notice": {
+		"title": "Notice Party",
+		"type": "other_party"
+	},
+	"Notice Only": {
+		"title": "Notice Party",
+		"type": "other_party"
+	},
+	"Notice Only Party": {
+		"title": "Notice Party",
+		"type": "other_party"
+	},
+	"Notice Party": {
+		"title": "Notice Party",
+		"type": "other_party"
+	},
+	"Objecting Party": {
+		"title": "Objecting Party",
+		"type": "other_party"
+	},
+	"Objector": {
+		"title": "Objector",
+		"type": "other_party"
+	},
+	"objector": {
+		"title": "Objector",
+		"type": "other_party"
+	},
+	"Official Defendant": {
+		"title": "Official Defendant",
+		"type": "defendant"
+	},
+	"Official Plaintiff": {
+		"title": "Official Plaintiff",
+		"type": "plaintiff"
+	},
+	"other": {
+		"title": "Other Party",
+		"type": "other_party"
+	},
+	"Other Party": {
+		"title": "Other Party",
+		"type": "other_party"
+	},
+	"Other Professional": {
+		"title": "Professional",
+		"type": "misc"
+	},
+	"Partner": {
+		"title": "Partner",
+		"type": "misc"
+	},
+	"Party of Interest": {
+		"title": "Party of Interest",
+		"type": "other_party"
+	},
+	"Petitioner": {
+		"title": "Petitioner",
+		"type": "plaintiff"
+	},
+	"petitioner": {
+		"title": "Petitioner",
+		"type": "plaintiff"
+	},
+	"Petitioning Creditor": {
+		"title": "Petitioning Creditor",
+		"type": "bk_party"
+	},
+	"Plaintiff": {
+		"title": "Plaintiff",
+		"type": "plaintiff"
+	},
+	"plaintiff": {
+		"title": "Plaintiff",
+		"type": "plaintiff"
+	},
+	"Plaintiff/Appellant": {
+		"title": "Plaintiff/Appellant",
+		"type": "plaintiff"
+	},
+	"Plaintiff - Consolidated": {
+		"title": "Consolidated Plaintiff",
+		"type": "plaintiff"
+	},
+	"Plaintiff - Estate": {
+		"title": "Estate Plaintiff",
+		"type": "plaintiff"
+	},
+	"Plaintiff Consolidated": {
+		"title": "Consolidated Plaintiff",
+		"type": "plaintiff"
+	},
+	"Plaintiff, Counter Defendant": {
+		"title": "Plaintiff/Counter Defendant",
+		"type": "plaintiff"
+	},
+	"PLSP Attorney Appointed for Plaintiff": {
+		"title": "Prisoner Litigation Settlement Program",
+		"type": "misc"
+	},
+	"Plsp Attorney Appointed for Plaintiff": {
+		"title": "Prisoner Litigation Settlement Program",
+		"type": "misc"
+	},
+	"Prisoner Litigation Settlement Program": {
+		"title": "Prisoner Litigation Settlement Program",
+		"type": "misc"
+	},
+	"Professional": {
+		"title": "Professional",
+		"type": "misc"
+	},
+	"Proposed": {
+		"title": "Proposed",
+		"type": "other_party"
+	},
+	"proposed": {
+		"title": "Proposed",
+		"type": "other_party"
+	},
+	"Reach and Apply Defendant": {
+		"title": "Reach and Apply Defendant",
+		"type": "defendant"
+	},
+	"Real Party In Interest Defendant": {
+		"title": "Real Party In Interest Defendant",
+		"type": "defendant"
+	},
+	"Real Party In Interest Dft": {
+		"title": "Real Party In Interest Defendant",
+		"type": "defendant"
+	},
+	"Realtor": {
+		"title": "Realtor",
+		"type": "misc"
+	},
+	"Receiver": {
+		"title": "Receiver",
+		"type": "other_party"
+	},
+	"receiver": {
+		"title": "Receiver",
+		"type": "other_party"
+	},
+	"Recruited Counsel": {
+		"title": "Recruited Counsel",
+		"type": "misc"
+	},
+	"Referee": {
+		"title": "Referee",
+		"type": "misc"
+	},
+	"Relator": {
+		"title": "Relator",
+		"type": "other_party"
+	},
+	"Relator Plaintiff": {
+		"title": "Relator Plaintiff",
+		"type": "plaintiff"
+	},
+	"Relief Defendant": {
+		"title": "Relief Defendant",
+		"type": "defendant"
+	},
+	"Requesting Party": {
+		"title": "Requesting Party",
+		"type": "other_party"
+	},
+	"Respondent": {
+		"title": "Respondent",
+		"type": "defendant"
+	},
+	"respondent": {
+		"title": "Respondent",
+		"type": "defendant"
+	},
+	"Responsible Third Party": {
+		"title": "Responsible Third Party",
+		"type": "other_party"
+	},
+	"Responsible ThirdParty": {
+		"title": "Responsible Third Party",
+		"type": "other_party"
+	},
+	"Responsible 3rd Party": {
+		"title": "Responsible Third Party",
+		"type": "other_party"
+	},
+	"Special Counsel": {
+		"title": "Special Counsel",
+		"type": "misc"
+	},
+	"Special Master": {
+		"title": "Special Master",
+		"type": "other_party"
+	},
+	"Special Mediation Counsel": {
+		"title": "Special Mediation Counsel",
+		"type": "misc"
+	},
+	"Stockholder": {
+		"title": "Stockholder",
+		"type": "misc"
+	},
+	"Substitute Custodian": {
+		"title": "Substitute Custodian",
+		"type": "other_party"
+	},
+	"Successor Trustee": {
+		"title": "Successor Trustee",
+		"type": "bk_party"
+	},
+	"Surety": {
+		"title": "Surety",
+		"type": "other_party"
+	},
+	"surety": {
+		"title": "Surety",
+		"type": "other_party"
+	},
+	"Surveyor": {
+		"title": "Surveyor",
+		"type": "misc"
+	},
+	"Taxpayer": {
+		"title": "Taxpayer",
+		"type": "misc"
+	},
+	"Technical Advisor": {
+		"title": "Technical Advisor",
+		"type": "misc"
+	},
+	"Third Party Cross Defendant": {
+		"title": "Third Party Cross Defendant",
+		"type": "other_party"
+	},
+	"Third-Party Cross Defendant": {
+		"title": "Third Party Cross Defendant",
+		"type": "other_party"
+	},
+	"ThirdParty Cross Defendant": {
+		"title": "Third Party Cross Defendant",
+		"type": "other_party"
+	},
+	"Third Pty Cross Defendant": {
+		"title": "Third Party Cross Defendant",
+		"type": "other_party"
+	},
+	"third-party cross defendant": {
+		"title": "Third Party Cross Defendant",
+		"type": "other_party"
+	},
+	"3rd Party Cross Defendant": {
+		"title": "Third Party Cross Defendant",
+		"type": "other_party"
+	},
+	"3rdParty Cross Defendant": {
+		"title": "Third Party Cross Defendant",
+		"type": "other_party"
+	},
+	"3rd Pty Cross Defendant": {
+		"title": "Third Party Cross Defendant",
+		"type": "other_party"
+	},
+	"Third Party Custodian": {
+		"title": "Third Party Custodian",
+		"type": "other_party"
+	},
+	"Third-Party Custodian": {
+		"title": "Third Party Custodian",
+		"type": "other_party"
+	},
+	"ThirdParty Custodian": {
+		"title": "Third Party Custodian",
+		"type": "other_party"
+	},
+	"Third Pty Custodian": {
+		"title": "Third Party Custodian",
+		"type": "other_party"
+	},
+	"3rd Party Custodian": {
+		"title": "Third Party Custodian",
+		"type": "other_party"
+	},
+	"3rdParty Custodian": {
+		"title": "Third Party Custodian",
+		"type": "other_party"
+	},
+	"3rd Pty Custodian": {
+		"title": "Third Party Custodian",
+		"type": "other_party"
+	},
+	"Third Party Defendant": {
+		"title": "Third Party Defendant",
+		"type": "defendant"
+	},
+	"Third-Party Defendant": {
+		"title": "Third Party Defendant",
+		"type": "defendant"
+	},
+	"ThirdParty Defendant": {
+		"title": "Third Party Defendant",
+		"type": "defendant"
+	},
+	"Third Pty Defendant": {
+		"title": "Third Party Defendant",
+		"type": "defendant"
+	},
+	"third-party defendant": {
+		"title": "Third Party Defendant",
+		"type": "defendant"
+	},
+	"third party defendant": {
+		"title": "Third Party Defendant",
+		"type": "defendant"
+	},
+	"3rd Party Defendant": {
+		"title": "Third Party Defendant",
+		"type": "defendant"
+	},
+	"3rdParty Defendant": {
+		"title": "Third Party Defendant",
+		"type": "defendant"
+	},
+	"3rd Pty Defendant": {
+		"title": "Third Party Defendant",
+		"type": "defendant"
+	},
+	"3rd party defendant": {
+		"title": "Third Party Defendant",
+		"type": "defendant"
+	},
+	"Third Party Plaintiff": {
+		"title": "Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Third-Party Plaintiff": {
+		"title": "Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"ThirdParty Plaintiff": {
+		"title": "Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Third Pty Plaintiff": {
+		"title": "Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"third-party plaintiff": {
+		"title": "Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"third party plaintiff": {
+		"title": "Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"3rd Party Plaintiff": {
+		"title": "Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"3rdParty Plaintiff": {
+		"title": "Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"3rd Pty Plaintiff": {
+		"title": "Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"3rd party plaintiff": {
+		"title": "Third Party Plaintiff",
+		"type": "plaintiff"
+	},
+	"Third Party Witness": {
+		"title": "Third Party Witness",
+		"type": "other_party"
+	},
+	"Trustee": {
+		"title": "Trustee",
+		"type": "bk_party"
+	},
+	"Trustee in Bankruptcy": {
+		"title": "Trustee in Bankruptcy",
+		"type": "bk_party"
+	},
+	"Underinsured Motorist Carrier": {
+		"title": "Underinsured Motorist Carrier",
+		"type": "other_party"
+	},
+	"Unknown": {
+		"title": "Unknown",
+		"type": "misc"
+	},
+	"unknown": {
+		"title": "Unknown",
+		"type": "misc"
+	},
+	"Unnamed Defendant": {
+		"title": "Unnamed Defendant",
+		"type": "defendant"
+	},
+	"US Trustee": {
+		"title": "U.S. Trustee",
+		"type": "bk_party"
+	},
+	"U.S. Trustee": {
+		"title": "U.S. Trustee",
+		"type": "bk_party"
+	},
+	"Witness": {
+		"title": "Witness",
+		"type": "misc"
+	},
+	"witness": {
+		"title": "Witness",
+		"type": "misc"
+	},
+	"X-Appellant": {
+		"title": "Cross Appellant",
+		"type": "other_party"
+	},
+	"X-Appellee": {
+		"title": "Cross Appellee",
+		"type": "other_party"
+	},
+	"X-Claimant": {
+		"title": "Cross Claimant",
+		"type": "other_party"
+	},
+	"X-Defendant": {
+		"title": "Cross Defendant",
+		"type": "other_party"
+	},
+	"X-Plaintiff": {
+		"title": "Cross Plaintiff",
+		"type": "other_party"
+	}
+}
