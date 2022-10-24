@@ -940,6 +940,8 @@ class DocumentScraper(CoreScraper):
         # Get all the document links for this file
         soup = BeautifulSoup( open(fpath).read(), "html.parser")
         docket_table = soup.select('table')[-2]
+        if self.court == 'psc':
+            docket_table = soup.select('table')[-1]
         if not re.match('^\s?Date Filed.*', docket_table.text):
             return
 
@@ -1639,6 +1641,7 @@ def scraper(inpath, mode, n_workers, court, case_type, auth_path, override_time,
          document_input, document_att, document_skip_seen, document_limit, document_all_docs):
     ''' Handles arguments/options, the run sequence of the 3 modules'''
 
+    Path(settings.LOG_DIR).mkdir(exist_ok=True)
     time_str = stools.get_time_central(as_string=True).replace(':','-')
     logpath = Path(settings.LOG_DIR) / f"log_{time_str}.txt"
     logging.basicConfig(level=logging.INFO, filename=logpath, filemode='w')

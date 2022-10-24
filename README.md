@@ -24,29 +24,28 @@ This is a demo version of PACER with demo credentials that can be used for free.
 
 ## 1. Getting Started
 
- - Clone this PACER-tools repo
- - Install any missing python packages
+ - Install the package: `pip install pacer-tools`
  - Make sure you have a recent version of Firefox installed (80.0+) and [GeckoDriver](https://github.com/mozilla/geckodriver) for Firefox
 
 **Download folder**
-For this tutorial we are going to put our data into */data/pacer*. The scraper separates out data by district, so it's best to have a subdirectory for each district, named by court abbreviation (e.g. */data/pacer/ilnd* for Northern District of Illinois). When the scraper runs it will build the necessary structure inside of that subdirectory that it needs to download and house the data from Pacer.
+For this tutorial we are going to use the resources in the */demo* directory of this repo and will put our data into */demo/pacer*. The scraper separates out data by district, so it's best to have a subdirectory for each district, named by court abbreviation (e.g. *demo/pacer/ilnd* for Northern District of Illinois). When the scraper runs it will build the necessary structure inside of that subdirectory that it needs to download and house the data from Pacer.
 
-Since we are using the PACER demo, we will use the court abbreviation it uses which is *psc* (for PACER Service Centre). The scraper will take an `inpath` argument, to which we will pass */data/pacer/psc*.
+Since we are using the PACER demo, we will use the court abbreviation it uses which is *psc* (for PACER Service Centre). The scraper will take an `inpath` argument, to which we will pass *demo/pacer/psc*.
 
 ## 2. Pacer credentials
-For most use you will need to put your Pacer login details into a json file. For this tutorial we'll be using the Pacer training site with the login details contained in */code/downloader/login/demo.auth*. When you are running the scraper using your own credentials you can use that file as a template.
+For most use you will need to put your Pacer login details into a json file. For this tutorial we'll be using the Pacer training site with the login details contained in *demo/auth.json*. When you are running the scraper using your own credentials you can use that file as a template.
 
 ## 3. Query Scraper
-The first thing we'll do with the scraper is download some query results. There is a demo query located at */code/downloader/demo.json*. This is a *.json* file that maps search criteria to fields in the Pacer query form.
+The first thing we'll do with the scraper is download some query results. There is a demo query located at *demo/query_conf.json*. This is a *.json* file that maps search criteria to fields in the Pacer query form.
  To create your own query later you can use the query builder (see the documentation).
 
-Throughout this tutorial we will be running the scrapers.py file from the */code/downloader* folder, and all paths are relative to this (but it can be run from anywhere, with relative paths adjusted accordingly).
+Throughout this tutorial we will be using the scraper command from the PACER-tools command-line utility.  Run `pacer-tools scraper` to see the full set of arguments.
 
 **Running script**
 
 To use the Query Scraper we just need to run the following:
 
-    python scrapers.py --override-time --query-conf demo.json ../../data/pacer/psc
+    pacer-tools scraper --override-time --query-conf demo/query_conf.json demo/pacer/psc
 
  - *The `--override-time` flag is to override time restriction (as it is designed to run be run overnight)
  - The `--query-conf` option points the scraper to a json config file with the parameters for our query.
@@ -61,7 +60,7 @@ The user will be prompted for the following:
 *Note*:
 *All of these parameters that the user was prompted for can actually be given as arguments to the script. These are all explained in full in the documentation. To avoid the prompting you can instead run:*
 
-    python scrapers.py --override-time --query-conf demo.json -m query -c psc -a login/demo.auth -cl 50 data/pacer/psc
+    pacer-tools scraper --override-time --query-conf demo/query_conf.json -m query -c psc -a demo/auth.json -cl 50 demo/pacer/psc
 
 
 **Result**
@@ -78,7 +77,7 @@ Next we will take that query results file and download all of the dockets for th
 **Running script**
 To use the Docket Scraper we will run the following:
 
-    python scrapers.py -m docket --docket-input ../../data/pacer/psc/queries/<query_file>.html -c psc -a login/demo.auth -cl 50 --override-time ../../data/pacer/psc
+    pacer-tools scraper -m docket --docket-input demo/pacer/psc/queries/<query_file>.html -c psc -a demo/auth.json -cl 50 --override-time demo/pacer/psc
 
  - The `--docket-input` option takes the path to the query file. The actual name of the query file (`<query_file>`) will vary as it includes a timestamp.
 
@@ -87,7 +86,7 @@ The Docket Scraper (as well as the Document Scraper which will look at next) run
 *Note: the scraper only keeps the civil and criminal cases, to download a specific case type you can use the ``--case-type`` option.*
 
 **Result**
-Once both browsers have finished and closed, all of the cases from the query results file should be downloaded and can be found in */data/pacer/psc/html*
+Once both browsers have finished and closed, all of the cases from the query results file should be downloaded and can be found in *demo/pacer/psc/html*
 
 
 
@@ -97,14 +96,12 @@ Lastly, we will get the actual documents associated with docket lines of the cas
 **Running script**
 To use the Document Scraper we run the following:
 
-    python scrapers.py -m document -c psc -a login/demo.auth -cl 50 --override-time ../../data/pacer/psc
+    pacer-tools scraper -m document -c psc -a demo/auth.json -cl 50 --override-time --document-input demo/document_input.csv demo/pacer/psc
     
-
- - When no input is specified, the Document Scraper will include all dockets in the */html* directory in the download. To download documents for specific documents see below.
  - There is a default limit of 1000 documents per case. Any case that has more than 1000 documents will be skipped. This limit can be changed by the  `--document-limit` option.
 
 **Result**
-The Document Scraper will usually take significantly longer to run than the Docket Scraper given the volume of documents in most cases. Once the documents have finished downloading they can be found in the */data/pacer/psc/docs* folder.
+The Document Scraper will usually take significantly longer to run than the Docket Scraper given the volume of documents in most cases. Once the documents have finished downloading they can be found in the *demo/pacer/psc/docs* folder.
  
 
  **Attachments and specific documents**
@@ -114,7 +111,7 @@ The Document Scraper will usually take significantly longer to run than the Dock
  - To get specific documents from specific cases, you can use the `--document-input` option to pass a *.csv* file with cases ids and list specific documents to retrieve, see the documentation for more.
 
 
-To see more specifics, options and use cases check out the detailed documentation [here](code/downloader/README.md).
+To see more specifics, options and use cases check out the detailed documentation [here](src/pacer_tools/code/downloader/README.md).
 
 # Parser Tutorial
 
@@ -123,7 +120,7 @@ This short section explains how to use the SCALES Parser tool to read HTMLs down
 **Running script**
 To use the parser on the HTMLs from the docket scraper in the previous tutorial, we will simply run the following:
 
-    python parse_pacer.py ../../data/pacer/psc/html
+    pacer-tools parser demo/pacer/psc/html
 
 **Result**
 Once the parser has finished, all the parsed versions of the HTML files can be found in */data/pacer/psc/json*.
