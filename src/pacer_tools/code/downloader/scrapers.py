@@ -1070,6 +1070,7 @@ class DocumentScraper(CoreScraper):
         year_part = ftools.decompose_caseno(ucid_data['case_no'])['year']
 
         fpath = self.dir.docs / year_part / fname
+        fpath.parent.mkdir(parents=True, exist_ok=True)
 
         if not from_doc_selection:
             logging.info(f"{self} downloading document: {doc_id}")
