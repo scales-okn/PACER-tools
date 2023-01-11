@@ -3,7 +3,7 @@ from glob import glob
 
 setup(
 	name='pacer-tools',
-	version='0.1.4',
+	version='0.1.5',
 	package_dir={'': 'src'},
 	packages=find_packages('src'),
 	install_requires=[
