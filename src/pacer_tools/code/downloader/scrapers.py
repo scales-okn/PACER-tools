@@ -917,7 +917,7 @@ class DocumentScraper(CoreScraper):
 
     def get_previously_downloaded_docs(self):
         '''Get the doc_ids of all the previously downloaded docs in the /docs directory'''
-        return [ftools.parse_document_fname(x.name)['doc_id'] for x in self.dir.docs.glob('*.pdf')]
+        return [ftools.parse_document_fname(x.name)['doc_id'] for x in self.dir.docs.glob('*/*.pdf')]
 
     @run_in_executor
     def pull_docs(self, docket):
