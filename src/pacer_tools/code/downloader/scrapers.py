@@ -1065,7 +1065,11 @@ class DocumentScraper(CoreScraper):
         att_index = self.clean_att_index(att['ind']) if att else None
         doc_id = ftools.generate_document_id(ucid, doc['ind'], att_index)
         fname =  ftools.generate_document_fname(doc_id, self.user_hash)
-        fpath = self.dir.docs/fname
+
+        ucid_data = dtools.parse_ucid(ucid)
+        year_part = ftools.decompose_caseno(ucid_data['case_no'])['year']
+
+        fpath = self.dir.docs / year_part / fname
 
         if not from_doc_selection:
             logging.info(f"{self} downloading document: {doc_id}")
