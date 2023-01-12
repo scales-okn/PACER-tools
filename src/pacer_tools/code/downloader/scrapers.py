@@ -977,7 +977,7 @@ class DocumentScraper(CoreScraper):
         '''Check if browser is at the document selection menu'''
         re_doc_selection = "Document Selection Menu"
         main_content = self.browser.find_elements(By.CSS_SELECTOR, "div#cmecfMainContent")[0]
-        return bool(re.match(rf"^\s+{re_doc_selection}.*", main_content.text))
+        return bool(re.match(rf"^{re_doc_selection}.*", main_content.text.strip()))
 
     def at_predownload(self):
         '''Check if at a 'pre-download' pdf embed page, file hasn't downloaded, open button appears'''
