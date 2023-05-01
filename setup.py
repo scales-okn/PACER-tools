@@ -1,9 +1,15 @@
 from setuptools import setup, find_packages
 from glob import glob
 
+from pathlib import Path
+base_dir = Path(__file__).parent
+long_description = (base_dir / "README.md").read_text()
+
 setup(
 	name='pacer-tools',
-	version='0.1.7',
+	version='0.1.8',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
 	package_dir={'': 'src'},
 	packages=find_packages('src'),
 	install_requires=[
