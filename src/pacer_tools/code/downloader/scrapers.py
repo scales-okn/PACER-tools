@@ -649,6 +649,7 @@ class DocketScraper(CoreScraper):
 
         else:
             print(f'ERROR: <case: {case["ucid"]}> not found, reason unknown')
+            return None, 0
 ###
 # Support Functions for Docket Scraper
 ###
