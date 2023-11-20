@@ -2,15 +2,18 @@
 import re
 import sys
 import json
+import copy
 import string
-import functools
 import asyncio
+import hashlib
+import functools
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from itertools import chain, groupby
 from datetime import datetime
+from itertools import chain, groupby
 from tqdm.autonotebook import tqdm
+tqdm.pandas()
 
 # Non-standard imports
 import usaddress
@@ -27,8 +30,234 @@ from support import bundler as bundler
 from support.core import std_path
 from support import fhandle_tools as ftools
 from support import lexicon
+from support import party_classification as pc
+from support import party_tagging as pt
 
-tqdm.pandas()
+
+
+def redact_private_individual_names(text, is_html=None, elective_nlp=None):
+    '''
+    Given some text (the html or json representation of a case), return a version of the text w/ private individuals' names redacted
+    '''
+    text = copy.deepcopy(text)
+
+    # values in this block copied from parse_pacer.py
+    re_party_charset = '[ A-Za-z0-9#&:;!?@_=\'\"\.\,\-\$\/\(\)\\\\]'
+    re_cr_base = f'Case title: {re_party_charset}{{1,200}}'
+    re_cv_base = f'(?:[^\(]{re_party_charset}{{0,200}}vs?(?:\. ?| )| ?in re:?| ?in the matter of){re_party_charset}{{1,200}}'
+    re_cr_title = re.compile(f'{re_cr_base}(?:\<|\()')
+    re_cv_title = re.compile(f'(?i)(?:\<br ?\/?\>|\)){re_cv_base}(?:\<|\()')
+    re_nature = re.compile('Nature of Suit: [A-Za-z0-9 :\(\)\.]{1,100}')
+    def _generic_re_existence_helper(obj, split_text, index, maxsplit=-1):
+        return line_detagger(obj.group()).split(split_text, maxsplit)[index] if obj!=None else None
+
+    def _hash_and_format_text(text, add_tags=True):
+        hashed = hashlib.md5(text.encode('utf-8')).hexdigest().upper()
+        if add_tags:
+            return f'<span style="color:purple">SCALES-Party-Hash-{hashed}</span>', f'<span style="color:purple">{hashed[:7]}</span>'
+        else:
+            return 'SCALES-Party-Hash-'+hashed, hashed[:7]
+
+    def _json_span_to_html_span(span, docket_text): #span should be a list so the func's penultimate line can mutate it (slight hack)
+        for i,ind in enumerate(span): # slightly deceptive use of var name 'ind'; this does 2 iterations (the span's start/end inds)
+            window_start, window_end = 0, ind # this window moves thru the text as we discover html tags to account for in the span
+            tag_is_open = False
+
+            while True:
+                text_to_check = docket_text[window_start:window_end]
+                if '<' not in text_to_check and not tag_is_open:#no html tag text that we need to account for, so no index adjustment
+                    break
+
+                num_chars_enclosed_in_tags = sum([len(x) for x in re.findall('<[^>]+>', text_to_check)]) # simplest kind of tag text
+                window_start = window_end
+                window_end += num_chars_enclosed_in_tags
+
+                # more complex kinds of tag text
+                if text_to_check.count('<') > text_to_check.count('>'): # a tag that extends past the end of the consideration window
+                    tag_is_open = True
+                    window_end += len(text_to_check.split('<')[-1])+1
+                elif text_to_check.count('>') > text_to_check.count('<'): # a tag that extends back before the start of the window
+                    tag_is_open = False
+                    window_end += len(text_to_check.split('>')[0])+1
+                elif tag_is_open: # in this case, we can deduce that both of the above kinds of tag text must be present
+                    window_end += len(text_to_check) - (
+                        sum([len(x) for x in re.findall('(?<=>)[^<]+(?=<)', text_to_check)]) + num_chars_enclosed_in_tags)
+
+                span[i] += (window_end-window_start) # however many chars of tag text we found, augment the json index by that amount
+        return span
+
+    # when processing html data, start with some minimal-effort cleaning and null checks
+    if is_html or (is_html is None and type(text)==str):
+        dkt_delim, table_start_delim, table_end_delim, party_delim_re, party_delim, dktline_delim = (
+            'Docket Text', 'cellspacing="5">', '</table>', '<b>(?!<u>)', '<b>', '<td valign="top">')
+        text = text.replace(' border="0"', '').replace('cellspacing=5','cellspacing="5"').replace(
+            'CELLSPACING=5','cellspacing="5"').replace('cellspacing="5" width="100%">','width="100%" cellspacing="5">')
+        if 'no party found' in text or text.count(table_start_delim)<2: # empty/partyless dockets don't need to be redacted
+            return text
+        
+        html_non_docket, html_docket = text.split(dkt_delim,1) if dkt_delim in text else (text, '')
+        pre_party_tables = table_start_delim.join(html_non_docket.split(table_start_delim)[0:2]) + table_start_delim
+        is_cr = 'CIVIL DOCKET' not in pre_party_tables
+        party_tables = html_non_docket.split(table_start_delim,2)[2].rsplit(table_end_delim,1)[0]
+        post_party_tables = table_end_delim + html_non_docket.split(table_start_delim,2)[2].rsplit(table_end_delim,1)[1]
+        party_chunks = re.split(party_delim_re, party_tables)
+
+        pre_dktlines = line_cleaner(html_docket.split(dktline_delim)[0]) or ''
+        dktlines = [line_cleaner((re.sub('<!--.*?-->', '', x) if '<!--' in x else x).replace('<i ', '<i> ').replace(
+            '<i></i>', '').replace(' <i> ', ' <i>').replace(' </i> ', '</i> ')) for x in html_docket.split(dktline_delim)[1:]]
+        parties_to_redact, hashes_short = [], {} # parties_to_redact contains tuples of the form (party_name, party_ind)
+
+        # prepare to redact from the party table, starting by determining the nature-of-suit subtype (for classify_party)
+        if is_cr:
+            nos_subtype = 'crim'
+        else:
+            nos_prelim = dei.nos_matcher(_generic_re_existence_helper(re_nature.search(
+                html_non_docket), 'Suit: ', -1, maxsplit=1), short_hand=True)
+            if not pd.isna(nos_prelim):
+                nos_subtype = list(dei.df_nos[dei.df_nos['number']==int(nos_prelim.split()[0])].sub_type)[0].replace(' ','_')
+            else:
+                nos_subtype = 'no_nos_subtype'
+
+        # for each chunk, parse out the name and ei (using the same method that process_entity_and_lawyers does in parse_pacer)
+        party_ind = -1
+        for j,party_chunk in enumerate(party_chunks[1:], start=1):
+            if '<tr>' in party_chunks[j-1] and not any((
+                    x in party_chunks[j-1].split('<tr>')[-1] for x in ('</td>', 'case number'))): # is this actually a party?
+                party_name = line_cleaner(line_detagger(party_chunk.split('</b>')[0]))
+                extra_info = extra_info_cleaner(parse_party_extra_info(
+                    party_chunk.split('</b>')[1].split('represented')[0]).get('raw_info'))
+                party_ind += 1
+
+                # determine whether to redact this party
+                if pc.classify_party(party_name, extra_info, nos_subtype, elective_nlp=elective_nlp,
+                    custom_classifier=pc.name_redaction_tree,
+                    custom_multient_handler=pc.name_redaction_multient_handler,
+                    custom_listname_mappings={'unnamed_individual_words':'other', 'family_words':'person'})[0] == 'redact':
+                    parties_to_redact.append((party_name, party_ind))
+
+                    # do the actual redaction
+                    hash_end_delim = 'represented' if 'represented' in party_chunk else '</tr>'
+                    hash_long, hashes_short[str(party_ind)] = _hash_and_format_text(f'{party_name} | {extra_info}')
+                    party_chunks[j] = ''.join((hash_long, '</b></td><td valign="top" width="20%" align="right">',
+                                               hash_end_delim, party_chunk.split(hash_end_delim,1)[1]))
+                    if len(party_chunks)>=j+2 and 'PRO SE' in party_chunks[j+1]:
+                        party_chunks[j+1] = hash_long + '</b><br>PRO SE' + party_chunks[j+1].split('PRO SE')[1]
+
+        # redact from the case title
+        title_re = re_cr_title if is_cr else re_cv_title
+        title = re.search(title_re, pre_party_tables)
+        if title:
+            edited_title = title.group()
+            for i, (party_name, party_ind) in enumerate(parties_to_redact):
+                if party_name.split()[-1] in edited_title:
+                    hash_for_title = hashes_short[str(party_ind)].replace('<','').replace('>','') # hack for parser regex use
+                    edited_title = edited_title.replace(party_name.split()[-1], hash_for_title)
+                if i==len(parties_to_redact)-1:
+                    edited_title = edited_title.replace(
+                        'span style="color:purple"','<span style="color:purple">').replace('/span','</span>') # paving-over of hack
+            pre_party_tables = pre_party_tables.split(title.group())[0]+edited_title+pre_party_tables.split(title.group())[1]
+
+        # generate the lists of spans to redact
+        span_lists = []
+        dktlines_parsed = [line_detagger(x) for x in dktlines] #redundant given jsons, but needed for separating html/json redaction
+        is_huge_case = len(parties_to_redact)>1000 # only about 1 in every 5k cases have 1000 parties to begin with
+        if is_huge_case:
+            print(f'Warning: skipping anchor tagger due to volume of parties to be redacted ({len(parties_to_redact)} parties)')
+        for party_name,_ in parties_to_redact:
+            span_lists.append(pt.tag_party_name_in_docket_texts(party_name, dktlines_parsed, skip_anchor_tagger=is_huge_case))
+
+        # prepare to redact from the docket entries, starting by iterating through the spans that need to be redacted
+        ambig_spans_seen = set()
+        all_spans = sorted(set(chain.from_iterable([[(parties_to_redact[i][1], y) for y in x] for i,x in enumerate(span_lists)])),
+                           key=lambda x: x[1][1], reverse=True) # do everyone's spans w/ largest span_start first so no interference
+        for i,span in enumerate(all_spans):
+            party_ind, (ind, span_start, span_end) = span
+            hash_string, skip = hashes_short[str(party_ind)], False
+            for oth_span in ([x for x in all_spans[i+1:] if x[1][0]==ind] if i<len(all_spans)-1 else []):
+                if oth_span[1][0]==ind:
+                    oth_party_ind, (_, oth_start, oth_end) = oth_span
+
+                    # check for some special cases
+                    if oth_start<=span_start and oth_end>=span_end:
+                        if all((oth_start==span_start, oth_end==span_end,
+                                hashes_short[str(party_ind)]!=hashes_short[str(oth_party_ind)])): # use special text if ambiguous party
+                            hash_string = hash_string.replace('</span>', f' or {hashes_short[str(oth_party_ind)].split(">",1)[1]}')
+                            ambig_spans_seen.add(oth_span)
+                        else: #skip if the other span encompasses the current span, or if a later same-hash party occupies the same span
+                            skip = True
+                            break
+
+            # do the actual redaction
+            if not skip and span not in ambig_spans_seen: # also skip if we covered this span in a previous ambiguous-party text
+                new_span_start, new_span_end = _json_span_to_html_span([span_start, span_end], dktlines[ind])
+                dktlines[ind] = dktlines[ind][:new_span_start] + hash_string + dktlines[ind][new_span_end:]
+        
+        # paste all the bits together and return
+        return ''.join((pre_party_tables, party_delim.join(party_chunks), post_party_tables,
+                        dkt_delim, pre_dktlines, ''.join([dktline_delim+x for x in dktlines])))
+
+    # processing json data is simpler; start by iterating through the parties and determining whether to redact each one
+    else:
+        nos_df = dei.df_nos[dei.df_nos['number']==int((text['nature_suit'] or '-1').split()[0])]
+        nos_subtype = list(nos_df.sub_type)[0].replace(' ','_') if len(nos_df) else 'no_nos_subtype'
+        parties_to_redact, hashes_short = [], {} # parties_to_redact contains tuples of the form (party_name, party_ind)
+        for party_ind, party in enumerate(text['parties']):
+            name, extra_info = party['name'], extra_info_cleaner(party['entity_info'].get('raw_info'))
+            if pc.classify_party(name, extra_info, nos_subtype, elective_nlp=elective_nlp,
+                custom_classifier=pc.name_redaction_tree,
+                custom_multient_handler=pc.name_redaction_multient_handler,
+                custom_listname_mappings={'unnamed_individual_words':'other'})[0] == 'redact':
+                parties_to_redact.append((name, party_ind))
+
+                # do the actual redaction
+                hash_long, hashes_short[str(party_ind)] = _hash_and_format_text(f'{name} | {extra_info}', add_tags=False)
+                text['parties'][party_ind]['name'], text['parties'][party_ind]['entity_info'] = hash_long, {}
+                for i,counsel in enumerate(text['parties'][party_ind]['counsel']):
+                    if counsel['is_pro_se']:
+                        text['parties'][party_ind]['counsel'][i]['name'] = hash_long
+                        text['parties'][party_ind]['counsel'][i]['entity_info'] = {}
+
+        # redact from the case title
+        if text['case_name']:
+            for party_name, party_ind in parties_to_redact:
+                if party_name.split()[-1] in text['case_name']:
+                    text['case_name'] = text['case_name'].replace(party_name.split()[-1], hashes_short[str(party_ind)])
+
+        # generate the lists of spans to redact
+        span_lists = []
+        is_huge_case = len(parties_to_redact)>1000 # only about 1 in every 5k cases have 1000 parties to begin with
+        if is_huge_case:
+            print(f'Warning: skipping anchor tagger due to volume of parties to be redacted ({len(parties_to_redact)} parties)')
+        for party_name,_ in parties_to_redact:
+            span_lists.append(pt.tag_party_name_in_docket_texts(party_name, [x['docket_text'] for x in text['docket']],
+                                                                skip_anchor_tagger=is_huge_case))
+
+        # prepare to redact from the docket entries, starting by iterating through the spans that need to be redacted
+        ambig_spans_seen = set()
+        all_spans = sorted(set(chain.from_iterable([[(parties_to_redact[i][1], y) for y in x] for i,x in enumerate(span_lists)])),
+                           key=lambda x: x[1][1], reverse=True) # do everyone's spans w/ largest span_start first so no interference
+        for i,span in enumerate(all_spans):
+            party_ind, (ind, span_start, span_end) = span
+            hash_string, skip = hashes_short[str(party_ind)], False
+            for oth_span in ([x for x in all_spans[i+1:] if x[1][0]==ind] if i<len(all_spans)-1 else []):
+                oth_party_ind, (_, oth_start, oth_end) = oth_span
+
+                # check for some special cases
+                if oth_start<=span_start and oth_end>=span_end:
+                    if all((oth_start==span_start, oth_end==span_end,
+                            hashes_short[str(party_ind)]!=hashes_short[str(oth_party_ind)])): # use special text if ambiguous party
+                        hash_string += f' or {hashes_short[str(oth_party_ind)]}'
+                        ambig_spans_seen.add(oth_span)
+                    else: #skip if the other span encompasses the current span, or if a later same-hash party occupies the same span
+                        skip = True
+                        break
+
+            # do the actual redaction
+            if not skip and span not in ambig_spans_seen: # also skip if we covered this span in a previous ambiguous-party text
+                dkt_txt_orig = text['docket'][ind]['docket_text']
+                text['docket'][ind]['docket_text'] = dkt_txt_orig[:span_start] + hash_string + dkt_txt_orig[span_end:]
+
+        return text
 
 
 

@@ -17,6 +17,21 @@ person_words = [
 'iii',
 'iv',
 'nee',
+'md', 'm d',
+'phd', 'ph d',
+'rn', 'r n',
+'lpn', 'l p n',
+'msn', 'm s n',
+'dnp', 'd n p',
+'aprn', 'a p r n',
+'arnp', 'a r n p',
+'fnp', 'f n p',
+'agpcnp', 'a g p c n p',
+'cna', 'c n a',
+'cnm', 'c n m',
+'mph', 'm p h',
+'dds', 'd d s',
+'esq',
 'also known as "',
 'interpreter needed',
 'interpreter required',
@@ -24,17 +39,7 @@ person_words = [
 
 
 
-role_words = [
-'md', 'm d',
-'phd', 'ph d',
-'rn', 'r n',
-'lpn', 'l p n',
-'cna', 'c n a',
-'cnm', 'c n m',
-'mph', 'm p h',
-'dds', 'd d s',
-'esq',
-'ausa',
+professional_words = [
 'ceo', 'c e o',
 'coo', 'c o o',
 'cfo', 'c f o',
@@ -43,13 +48,13 @@ role_words = [
 'principal',
 'attorney',
 'atty',
+'ausa',
 'district attorney',
 'state attorney', "state's attorney",
 'attorney general', 'atttorney general', 'state attorney general',
 'judge',
 'magistrate',
 'honorable', 'hon',
-'witness',
 'officer', 'offier', 'officee',
 'ofc', 'off',
 'police officer',
@@ -122,18 +127,12 @@ role_words = [
 'admin',
 'superintendent', 'superintendant',
 'supt',
-'guardian',
-'next friend', 'next of friend',
-'heir',
 'representative',
 'mediator',
 'coordinator',
 'owner',
-'occupant',
-'tenant',
-'resident', 'residant',
+'employee',
 'member',
-'subscriber',
 'professor',
 'regent',
 'doctor',
@@ -145,21 +144,32 @@ role_words = [
 'clerk',
 'librarian',
 'technician',
-'employee',
 'servant',
-'victim',
 'chaplain',
 'pastor',
 'reverend',
 'rev',
-'bishop',
+# 'bishop',
 'archbishop',
 'ambassador',
 'underwriter',
 'social worker',
 'tax collector',
 'postmaster general', 'postmater general',
+'pslc', 'p s l c']
+
+role_words_non_professional = [
 'citizen',
+'tenant',
+'occupant',
+'resident', 'residant',
+'subscriber',
+'victim',
+'witness',
+'heir',
+'guardian',
+'power of attorney',
+'next friend', 'next of friend',
 'an individual',
 'a foreign individual',
 'a person',
@@ -168,8 +178,7 @@ role_words = [
 'herself',
 'his capacity', 'her capacity', 'his or her capacity',
 'his individual', 'her individual', 'his or her individual',
-'his official', 'her official', 'his or her official',
-'pslc', 'p s l c']
+'his official', 'her official', 'his or her official']
 
 unnamed_individual_words = [
 'john doe', 'jane doe',
@@ -185,7 +194,8 @@ unnamed_individual_words = [
 
 family_words = [
 'spouse',
-'partner',
+# 'partner',
+'surviving partner',
 'husband',
 'wife',
 'son',
@@ -205,7 +215,7 @@ family_words = [
 
 family_words_plural = [
 'spouses',
-'partners',
+# 'partners',
 'husbands',
 'wives',
 'sons',
@@ -220,8 +230,8 @@ family_words_plural = [
 'aunts',
 'uncles',
 'nieces',
-'nephews',
-'cousins']
+'nephews']
+# 'cousins']
 
 
 
@@ -401,7 +411,7 @@ gov_words = [
 'city', 'cities',
 'new york city of', 'oklahoma city of', 'kansas city of', 'new jersey city of',
 'county', 'counties',
-'town', 'towns',
+'town', # 'towns',
 'township', 'townships',
 'village', 'villages',
 'borough', 'boroughs',
@@ -542,6 +552,7 @@ gov_entities = [
 'general sessions court',
 "attorney's office", 'attorney office',
 'usao', 'u s a o',
+'cbs chambers',
 'court appointed special advocates', 'court appointed child advocates',
 'c a s a',
 'community emergency response team',
@@ -664,8 +675,8 @@ us_state_names = [
 'wisconsin',
 'wyoming']
 
-# 'state of pa' intended to prevent collisions with 'pa' in company_acronyms_common
-us_state_abbrevs = ['al', 'ak', 'as', 'az', 'ar', 'ca', 'co', 'ct', 'dc', 'de', 'fl', 'ga', 'gu', 'hi', 'id', 'il', 'in', 'ia', 'ks', 'ky',
+# 'state of pa' intended to prevent collisions with 'pa' in company_acronyms_common; 'gu' omitted to prevent collisions with names
+us_state_abbrevs = ['al', 'ak', 'as', 'az', 'ar', 'ca', 'co', 'ct', 'dc', 'de', 'fl', 'ga', 'hi', 'id', 'il', 'in', 'ia', 'ks', 'ky',
 'la', 'me', 'mp', 'md', 'ma', 'mi', 'mn', 'ms', 'mo', 'mt', 'ne', 'nv', 'nh', 'nj', 'nm', 'ny', 'nc', 'nd', 'oh', 'ok', 'or', 'pa', 'pr',
 'ri', 'sc', 'sd', 'tn', 'tx', 'ut', 'vt', 'vi', 'va', 'wa', 'wv', 'wi', 'wy', 'state of pa', 'of pa', 'pa state']
 
@@ -782,7 +793,7 @@ company_acronyms_uncommon = [
 'ohg',
 'oy',
 'oyj',
-'oü',
+'oü', 'ou',
 'pl', 'p/l',
 'pma',
 'pmdn',
@@ -934,7 +945,7 @@ company_words_uncommon = [
 'spolka',
 'spolka',
 'tiha',
-'turk',
+# 'turk',
 'vennootschap',
 'verejna',
 'volkseigner']
@@ -1040,14 +1051,16 @@ dba_words = [
 'also trading as',
 'a/t/a']
 
-eng_words_person_adjacent = [
+eng_words_professional_adjacent = [
 'trustee', 'us trustee', 'united states trustee',
 'chapter',
 'ch',
 'agent',
 'star',
 'badge',
-'shield',
+'shield']
+
+eng_words_role_non_professional_adjacent = [
 'not', 'individually', 'indiv', 'indv',
 'also known as',
 'named as',
@@ -11079,12 +11092,20 @@ english_words = [
  # hand-coded list of words in english_words that should be considered surnames
 surnames_in_english_corpus = [
 'ericsson',
+'fu',
+'ge',
+'he',
+'hu',
 'kruger',
+'mu',
+'ni',
+'ou',
 'philips',
 'suzuki',
-'xi']
+'xi',
+'ye']
 for x in surnames_in_english_corpus:
-    english_words.remove(x)
+	english_words.remove(x)
 
 
 
