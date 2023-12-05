@@ -185,7 +185,11 @@ class CoreScraper:
         # Sets instance specific temp download folder (needed for document downloader)
         options = stools.get_firefox_options(self.dir.temp_subdir(self.ind), self.headless)
         self.browser = Firefox(options=options)
-        return self.login()
+        login_success = self.login()
+        if login_success and self.at_redaction_agreement():
+            self.browser.find_element(By.CSS_SELECTOR, 'input[type="checkbox"]').click()
+            self.browser.find_element(By.LINK_TEXT, "Continue").click()
+        return login_success
 
     def close_browser(self):
         if self.browser:
@@ -445,6 +449,11 @@ class DocketScraper(CoreScraper):
             return longtime_str in page_text
         except selenium.common.exceptions.NoSuchElementException:
             return False
+
+    def at_redaction_agreement(self):
+        ''' Check if at the "Redaction Agreement" page (filer accounts only) '''
+        text = self.browser.find_element(By.CSS_SELECTOR, '#cmecfMainContent')
+        return "Redaction Agreement" in text
 
     @run_in_executor
     def pull_case(self, case, new_member_list_seen):
