@@ -452,7 +452,7 @@ class DocketScraper(CoreScraper):
 
     def at_redaction_agreement(self):
         ''' Check if at the "Redaction Agreement" page (filer accounts only) '''
-        text = self.browser.find_element(By.CSS_SELECTOR, '#cmecfMainContent')
+        text = self.browser.find_element(By.CSS_SELECTOR, '#cmecfMainContent').text
         return "Redaction Agreement" in text
 
     @run_in_executor
