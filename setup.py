@@ -1,3 +1,8 @@
+# to update the pypi package:
+# (1) iterate the version in this file
+# (2) python setup.py bdist_wheel --universal
+# (3) twine upload dist/* (requires pypi credentials)
+
 from setuptools import setup, find_packages
 from glob import glob
 
