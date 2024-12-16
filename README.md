@@ -1,3 +1,5 @@
+*In addition to this documentation page, you may also find SCALES's [documentation site](https://docs.scales-okn.org/) helpful, particularly the pages concerning our scraper and parser.*
+
 # Table of Contents
 * [Scraper Tutorial](README.md#scraper-tutorial)
     1) [Getting Started](README.md#1-getting-started)
@@ -16,7 +18,7 @@ The scraper has three modules:
  2. Docket Scraper: to download case dockets
  3. Document Scraper: to download case documents
 
-This tutorial will step through the basics of getting set up with the scraping tool and using each module. For more details, see the documentation [here](code/downloader/README.md)
+This tutorial will step through the basics of getting set up with the scraping tool and using each module. For more details, see the documentation [here](src/pacer_tools/code/downloader/README.md)
 
 The tutorial uses the PACER demo site located here: https://dcecf.psc.uscourts.gov/cgi-bin/ShowIndex.pl
 
@@ -125,4 +127,4 @@ To use the parser on the HTMLs from the docket scraper in the previous tutorial,
 **Result**
 Once the parser has finished, all the parsed versions of the HTML files can be found in */data/pacer/psc/json*.
 
-To see more specifics, options, and details on the JSON schema, check out the detailed documentation [here](code/parsers/README.md).
+To see more specifics, options, and details on the JSON schema, check out the detailed documentation [here](src/pacer_tools/code/parsers/README.md).
