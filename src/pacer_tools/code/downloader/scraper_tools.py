@@ -373,7 +373,8 @@ def get_firefox_options(download_dir, headless=False):
     options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/pdf")
     options.set_preference("plugin.disable_full_page_plugin_for_types", "application/pdf")
     options.set_preference("pdfjs.disabled", True)
-    options.headless = headless
+    if headless:
+        options.add_argument("-headless")
     return options
 
 def get_time_central(as_string=False):
