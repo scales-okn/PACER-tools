@@ -10,9 +10,10 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed, ThreadPoolExecutor
 from rdflib import Graph, Namespace, Literal, RDF, XSD
 
-sys.path.append(str(Path.cwd().parents[1].resolve()))
+sys.path.append(str(Path(__file__).resolve().parents[0]))
 import utils
 from constants import SCALES, J, NC, NIBRS, FIPS
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 from support import settings
 
 crosswalk_df = pd.read_csv(settings.NIBRS_CROSSWALK_CLAYTON).rename(

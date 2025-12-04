@@ -28,9 +28,10 @@ from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, as_completed, ThreadPoolExecutor
 from rdflib import Graph, Literal, URIRef, RDF, XSD
 
-sys.path.append(str(Path.cwd().parents[1].resolve()))
+sys.path.append(str(Path(__file__).resolve().parents[0]))
 import utils
 from constants import SCALES, J, NC, FIPS
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 from support import data_tools as dtools
 from support import entity_functions as efunc
 from support import fjc_functions as fjc
