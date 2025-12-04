@@ -70,12 +70,12 @@ def _make_metadata_graph():
         court_level = court.split('ga-clayton-')[1].split('-')[0]
         court_uri = utils._make_generic_uri('Court', court)
         g.add((court_uri, J.CourtName,
-            f'{court_level.capitalize()} Court of Clayton County, Georgia'))
+            Literal(f'{court_level.capitalize()} Court of Clayton County, Georgia')))
         g.add((court_uri, FIPS.CountyCode, Literal(13063)))
-        g.add((court_uri, J.CourtCategoryCode, {
-            'superior':'SUP', 'magistrate':'MAG', 'state':'COC'}[court_level]))
+        g.add((court_uri, J.CourtCategoryCode, Literal({
+            'superior':'SUP', 'magistrate':'MAG', 'state':'COC'}[court_level])))
         for zipcode in (30236, 30238, 30260, 30273, 30274, 30288, 30296, 30297):
-            g.add((court_uri, NC.AddressPostalCode, zipcode))
+            g.add((court_uri, NC.AddressPostalCode, Literal(zipcode)))
     return g
 
 
@@ -207,7 +207,7 @@ def process_json_file(json_file, charge_uris):
     # Top-level fields
     ucid = data.get("ucid")
     case_uri = utils._make_case_uri(ucid)
-    g.add((case_uri, RDF.type, nc.CourtCase))
+    g.add((case_uri, RDF.type, NC.CourtCase))
     g.add(
         (
             case_uri,
@@ -401,11 +401,13 @@ def main(indir, outdir, skip_annotations):
     utils._write_graph_to_file(_make_metadata_graph(), outdir, file_name='courts.ttl')
 
     # Write the annotation files
+    charge_uris = set()
     if not skip_annotations:
-        print("Loading/processing sentences...")
-        charge_uris = process_sentences(outdir)
-        print("Loading/processing entities...")
-        process_entities(outdir)
+        print('Clayton annotations not yet implemented in PACER-tools; skipping...')
+        # print("Loading/processing sentences...")
+        # charge_uris = process_sentences(outdir)
+        # print("Loading/processing entities...")
+        # process_entities(outdir)
 
     # Recursively find all JSON files in indir and subdirectories
     print(f"Loading JSON files...")

@@ -1,6 +1,6 @@
 # to update the pypi package:
 # (1) rm -r build dist (not strictly necessary, but prevents superfluous uploads of old versions)
-# (1) iterate the version in this file
+# (1) iterate the version in this file (unless revising a broken version, in which case pypi can replace it)
 # (2) python setup.py bdist_wheel --universal (check.warn(importable) can be ignored if data_files takes care of the directories in question)
 # (3) twine upload dist/* (requires pypi credentials)
 
@@ -13,7 +13,7 @@ long_description = (base_dir / "README.md").read_text()
 
 setup(
 	name='pacer-tools',
-	version='0.1.12',
+	version='0.1.13',
     long_description=long_description,
     long_description_content_type='text/markdown',
 	package_dir={'': 'src'},

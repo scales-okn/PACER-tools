@@ -236,7 +236,7 @@ def write_metadata_files(outdir, jel=None):
                 if not pd.isna(jel.at[sjid, extra_key]):
                     v = jel.at[sjid, extra_key]
                     triples.append(
-                        (judge_uri, scales[property_name], Literal(v))
+                        (judge_uri, SCALES[property_name], Literal(v))
                     )
 
                     if extra_key == "NID":
@@ -506,7 +506,7 @@ def add_case_json_to_graph(g, jdata, entity_lists):
         entry_uris.append(utils._make_docket_uri(jdata["ucid"], i))
         triples += [
             (entry_uris[i], RDF.type, J.RegisterAction),
-            (table_uri, rdf[f"_{i}"], entry_uris[i]),
+            (table_uri, RDF[f"_{i}"], entry_uris[i]),
             (table_uri, J.RegisterAction, entry_uris[i]),
             (entry_uris[i], NC.AdministrativeID, Literal(entry["ind"])),
             (
@@ -748,7 +748,7 @@ def add_idb_data_to_graph(idb_row, jdata, g):
             triples.append(
                 (
                     case_uri,
-                    scales["hasIdb" + col.capitalize()],
+                    SCALES["hasIdb" + col.capitalize()],
                     Literal(idb_row[col]),
                 )
             )
@@ -887,7 +887,7 @@ def main(
     if ucid_list:
         ucids = list(pd.read_csv(ucid_list)["ucid"])
     else:
-        ucids = list(pd.read_csv(settings.DATA_EXPLORER_UCIDS)["ucid"])
+        ucids = list(pd.read_csv(settings.DATA_EXPLORER_UCIDS)["ucid"]) # DATA_EXPLORER_UCIDS not included for PACER-tools, so ucid_list must be passed
 
     if not skip_metadata:
         print("\nLoading JEL (master judge-entity table)...")
@@ -918,16 +918,16 @@ def main(
         onto = (
             pd.DataFrame(onto.groupby("ucid")).set_index(0).reindex(ucids).reset_index()
         )
-        if len(ifp_data):
-            ifp_data = ifp_data.set_index("ucid").drop("_id", axis=1)
-        ifp_data = ifp_data.reindex(ucids)
+        # if len(ifp_data):
+        #     ifp_data = ifp_data.set_index("ucid").drop("_id", axis=1)
+        # ifp_data = ifp_data.reindex(ucids)
         idb_data = idb_data.reindex(ucids)
 
         onto_list = list(onto.iloc[:, 1]) if isinstance(onto, pd.DataFrame) else onto
-        if isinstance(ifp_data, pd.DataFrame):
-            ifp_list = ifp_data.to_dict(orient="records")
-        else:
-            ifp_list = ifp_data
+        # if isinstance(ifp_data, pd.DataFrame):
+        #     ifp_list = ifp_data.to_dict(orient="records")
+        # else:
+        #     ifp_list = ifp_data
         if isinstance(idb_data, pd.DataFrame):
             idb_list = idb_data.to_dict(orient="records")
         else:
@@ -943,11 +943,11 @@ def main(
 
         if not skip_annotations:
             onto_chunk = onto.iloc[start:end]
-            ifp_chunk = ifp_data.iloc[start:end]
+            # ifp_chunk = ifp_data.iloc[start:end]
             idb_chunk = idb_data.iloc[start:end]
 
             onto_list = list(onto_chunk.iloc[:, 1])
-            ifp_list = ifp_chunk.to_dict(orient="records")
+            # ifp_list = ifp_chunk.to_dict(orient="records")
             idb_list = idb_chunk.to_dict(orient="records")
 
             process_args = [
@@ -957,7 +957,7 @@ def main(
                     skip_cases,
                     skip_annotations,
                     onto_list[i - start],
-                    ifp_list[i - start],
+                    None, # ifp_list[i - start],
                     idb_list[i - start],
                 )
                 for i in range(start, end)
