@@ -1343,9 +1343,11 @@ def ucid(court, case_id, clean=False, allow_def_stub=True):
     Output:
         (str or Series) like 'nced;;5:16-cv-00843'
     '''
-    bk_match = re.match('(?:\d:)?(?:\d{2,3}|noyear)[:-]([a-z]{1,2}-)?(?:\d{2,5}|[a-z]{3}-\d)', case_id) # recap bankruptcy format
-    if 'http' in court: # recap returns the court as an api-endpoint url
-        court = court.strip('/').split('/')[-1]
+    
+    if type(case_id)!=pd.Series: # presumably this block will only be used for bankruptcy work, and e.g. load_idb_csv should skip it
+        bk_match = re.match('(?:\d:)?(?:\d{2,3}|noyear)[:-]([a-z]{1,2}-)?(?:\d{2,5}|[a-z]{3}-\d)', case_id) # recap bankruptcy format
+        if 'http' in court: # recap returns the court as an api-endpoint url
+            court = court.strip('/').split('/')[-1]
 
     if type(case_id)==pd.Series:
         if not clean:
