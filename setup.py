@@ -13,7 +13,7 @@ long_description = (base_dir / "README.md").read_text()
 
 setup(
 	name='pacer-tools',
-	version='0.1.13',
+	version='0.1.15',
     long_description=long_description,
     long_description_content_type='text/markdown',
 	package_dir={'': 'src'},
@@ -29,7 +29,7 @@ setup(
         'pyOpenSSL', 'PySocks', 
         'python-crfsuite', 'python-dateutil', 'python-dotenv', 
         'python-Levenshtein', 'pytz', 'rdflib', 'requests', 
-        'requests-file', 'scipy', 'selenium', 
+        'requests-file', 'sas7bdat', 'scipy', 'selenium', 
         'selenium-requests', 'sgmllib3k', 'simplejson',
         'six', 'sniffio', 
         'sortedcontainers', 'soupsieve', 'tldextract', 

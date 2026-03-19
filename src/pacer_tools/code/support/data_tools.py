@@ -1396,7 +1396,7 @@ def get_ucid_weak(ucid):
      '''
 
     if type(ucid)==pd.Series:
-        return ucid.str.replace(rf"{ftools.re_com['office']}:", '')
+        return ucid.str.replace(rf"{ftools.re_com['office']}:", '', regex=True)
     else:
         return re.sub(rf"{ftools.re_com['office']}:", '', ucid)
 
